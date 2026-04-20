@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "matter_types": [
+    {
+      "name": "Conveyancing, Residential",
+      "sub_types": [
+        {
+          "name": "Purchase",
+          "prefix": "Purchase of",
+          "menus": [
+            "Events",
+            "Finance",
+            "Property"
+          ]
+        },
+        {
+          "name": "Remortgage",
+          "prefix": "Remortgage of",
+          "menus": [
+            "Events",
+            "Finance",
+            "Property"
+          ]
+        },
+        {
+          "name": "Sale",
+          "prefix": "Sale of",
+          "menus": [
+            "Events",
+            "Finance",
+            "Property"
+          ]
+        },
+        {
+          "name": "Transfer",
+          "prefix": "Transfer of",
+          "menus": [
+            "Events",
+            "Finance",
+            "Property"
+          ]
+        }
+      ]
+    }
+  ]
+}

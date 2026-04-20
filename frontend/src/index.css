@@ -1,0 +1,2815 @@
+:root {
+  --app-font-stack: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Dark blue page + white interactive surfaces (cards, sidebar, chrome) */
+  --bg: #1e3a8a;
+  /* Single flat blue (no gradient); alias for embeds that used --page-gradient */
+  --page-bg: #1e3a8a;
+  --page-gradient: #1e3a8a;
+  --panel: #ffffff;
+  /* Nested rows / chrome inside white panels — still reads as “white” on blue */
+  --panel2: #f8fafc;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: rgba(15, 23, 42, 0.1);
+  --shadow: rgba(15, 23, 42, 0.1) 0 12px 32px, rgba(15, 23, 42, 0.04) 0 2px 8px;
+  --primary: #2563eb;
+  --primary-rgb: 37, 99, 235;
+  /* Text on top bar buttons that use ``--page-bg`` as fill (set from ``theme.ts``). */
+  --text-on-page-bg: #f8fafc;
+  --danger: #dc2626;
+  --card: #ffffff;
+  --sidebar-bg: #ffffff;
+  --hover: rgba(15, 23, 42, 0.06);
+  /* Main menu cases table + case documents list (shared row rhythm / type). */
+  --canary-table-row-gap: calc(8px * 0.85);
+  --canary-table-row-padding: calc(12px * 0.85);
+  --canary-table-row-min-height: calc(4rem * 0.85);
+  --canary-table-font-size: 1rem;
+  --canary-table-line-height: 1.4;
+  color-scheme: light;
+  font-family: var(--app-font-stack);
+}
+
+html.dark {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --page-bg: #0f172a;
+  --page-gradient: #0f172a;
+  --panel: #1e293b;
+  --panel2: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: rgba(148, 163, 184, 0.2);
+  --shadow: rgba(0, 0, 0, 0.35) 0 12px 32px;
+  --card: #1e293b;
+  --sidebar-bg: #1e293b;
+  --hover: rgba(255, 255, 255, 0.06);
+  --text-on-page-bg: #f1f5f9;
+}
+
+/* Default / inactive buttons and form fields must stay readable on dark panels */
+html.dark .btn:not(.primary):not(.danger) {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+html.dark .btn.primary {
+  background: rgba(var(--primary-rgb), 0.28);
+  color: #e8edff;
+  border-color: rgba(var(--primary-rgb), 0.55);
+}
+
+html.dark .navBtn:not(.active) {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+html.dark input,
+html.dark textarea {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--muted);
+}
+
+html.dark select {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* App chrome: avoid accidental text selection; keep inputs/selects/textarea selectable */
+.appShell,
+.mainMenuShell,
+.caseShell,
+.modalOverlay,
+.topbar {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable='true'],
+.allow-select {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Avoid shrinking the effective viewport (was 1.2); case view should fit one screen when maximised. */
+html {
+  zoom: 1;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--app-font-stack);
+}
+
+/*
+ * Buttons, inputs, and selects do not inherit the body font in most browsers (they use a separate UA
+ * typeface). User settings → Appearance sets --app-font-stack on :root; inherit so main menu, tables,
+ * toolbars, and forms all use the same font.
+ */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.appShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  /* Match .main horizontal padding so top nav (e.g. Main Menu) lines up with case page toolbar (Edit details). */
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), 0 8px 28px rgba(15, 23, 42, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.topbarMain {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+.loginScreen {
+  box-sizing: border-box;
+  margin: 48px auto;
+  padding: 0 12px;
+  max-width: min(1000px, 94vw);
+}
+
+.loginBrandRow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.appLogo {
+  display: block;
+  object-fit: contain;
+}
+
+.appLogo--login {
+  max-width: min(960px, 92vw);
+  max-height: 300px;
+  width: auto;
+  height: auto;
+}
+
+.topNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.navBtn {
+  border: 1px solid var(--border);
+  background: #f1f5f9;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+a.navBtn {
+  text-decoration: none;
+  display: inline-block;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.navBtn.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #f8fafc;
+}
+
+/* Main app header: ribbon buttons match Appearance → page background */
+.topbar .navBtn:not(.active) {
+  background: var(--page-bg);
+  color: var(--text-on-page-bg);
+  border-color: color-mix(in srgb, var(--text-on-page-bg) 38%, var(--page-bg));
+}
+
+.topbar .navBtn.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #f8fafc;
+}
+
+.topbar .btn:not(.primary):not(.danger) {
+  background: var(--page-bg);
+  color: var(--text-on-page-bg);
+  border-color: color-mix(in srgb, var(--text-on-page-bg) 38%, var(--page-bg));
+}
+
+html.dark .topbar .btn:not(.primary):not(.danger) {
+  background: var(--page-bg);
+  color: var(--text-on-page-bg);
+  border-color: color-mix(in srgb, var(--text-on-page-bg) 38%, var(--page-bg));
+}
+
+.main {
+  padding: 12px 20px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* Main menu: full-width white panels, small side padding, cases list fills viewport height */
+.main.main--mainMenu {
+  padding: 12px 16px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+}
+
+.mainMenuShell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* Cases list: stretch table card to bottom of main; scroll inside */
+.mainMenuShell--mainMenu {
+  min-height: 0;
+}
+
+.mainMenuShell--mainMenu > .error,
+.mainMenuShell--mainMenu > .mainMenuFilterBar {
+  flex-shrink: 0;
+}
+
+/* Search width = 25% of full filter bar (not the flex left group), so Main menu and Tasks match. */
+.mainMenuFilterBar {
+  container-type: inline-size;
+}
+
+.mainMenuShell--mainMenu .casesTableCard {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Reports placeholder — full width like other menu tables; copy top-left */
+.mainMenuShell--mainMenu .reportsPageShell {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 24px 28px;
+  align-items: flex-start;
+  text-align: left;
+  overflow: auto;
+}
+
+.mainMenuShell--mainMenu .reportsPageTitle {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.mainMenuShell--mainMenu .reportsPageLead {
+  margin: 0;
+  font-size: 15px;
+  align-self: flex-start;
+}
+
+.mainMenuShell--mainMenu .casesTableScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mainMenuShell--mainMenu .casesTableScroll .tr.th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/*
+ * Main menu cases: Reference · Client · Description · Fee earner · Status
+ * Matches MAIN_MENU_CASES_TABLE_GRID in App.tsx — Client 30fr; Status 5fr (5% moved from Status to Client).
+ */
+.mainMenuShell--mainMenu .casesTableScroll .tr {
+  grid-template-columns:
+    minmax(0, 10fr)
+    minmax(0, 30fr)
+    minmax(0, 35fr)
+    minmax(0, 20fr)
+    minmax(0, 5fr);
+}
+
+/* Closed / archived matters — muted row (main menu cases list only). */
+.mainMenuShell--mainMenu .casesTableScroll .tr.rowbtn.casesRowInactive {
+  color: var(--muted);
+  opacity: 0.78;
+}
+
+.mainMenuShell--mainMenu .casesTableScroll .tr.rowbtn.casesRowInactive:hover {
+  background: rgba(var(--primary-rgb), 0.04);
+}
+
+.mainMenuShell--mainMenu .casesTableScroll .tr.rowbtn.casesRowInactive.active {
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+/*
+ * Tasks list (left → right): Date · Priority · Assigned · Task · Description · Client · Reference
+ * Grid matches TASKS_MENU_TABLE_GRID in App.tsx — Description is 30fr / 100fr (30% of row).
+ */
+.mainMenuShell--mainMenu .tasksTableScroll .tr {
+  grid-template-columns:
+    minmax(0, 8.768fr)
+    minmax(0, 6.427fr)
+    minmax(0, 8.768fr)
+    minmax(0, 20.459fr)
+    minmax(0, 30fr)
+    minmax(0, 18.267fr)
+    minmax(0, 7.311fr);
+}
+
+.taskMenuRow--high {
+  background: rgba(220, 38, 38, 0.12) !important;
+}
+
+.taskMenuRow--done {
+  background: rgba(22, 163, 74, 0.15) !important;
+}
+
+.caseDocsCard--dragOver {
+  outline: 2px solid rgba(37, 99, 235, 0.55);
+  outline-offset: 2px;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.mainMenuShell--surface {
+  background: var(--card);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+/* Global contacts list (Contacts page): Name 30%; Type · Email · Phone share 70% equally — matches CONTACTS_TABLE_GRID in App.tsx */
+.mainMenuShell--mainMenu .contactsTableScroll .tr {
+  grid-template-columns: minmax(0, 90fr) minmax(0, 70fr) minmax(0, 70fr) minmax(0, 70fr);
+}
+
+.mainMenuFilterRow--toolbar {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 12px;
+}
+
+.mainMenuFilterRowLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mainMenuFilterRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Match case toolbar search: modest width, not a fraction of the full viewport. */
+.mainMenuFilterRow .mainMenuSearchInput,
+.mainMenuFilterRowLeft .mainMenuSearchInput {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 160px;
+  max-width: 360px;
+}
+
+.mainMenuFilterBtnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mainMenuFilterBtnIcon {
+  flex-shrink: 0;
+  display: block;
+  color: currentColor;
+}
+
+.mainMenuFilterBtnCount {
+  font-weight: 500;
+  opacity: 0.92;
+}
+
+.mainMenuFilterDropdown {
+  z-index: 250;
+}
+
+.mainMenuFilterDropdownBody {
+  padding: 8px 12px 12px;
+}
+
+.mainMenuFilterDropdownBody .field {
+  margin-bottom: 0;
+}
+
+.mainMenuFilterDropdownBody .field select {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.pane {
+  min-height: 0;
+}
+
+.paneHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.error {
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.08);
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: rgba(var(--primary-rgb), 0.12);
+  border-color: rgba(var(--primary-rgb), 0.45);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.btn.danger {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #b91c1c;
+}
+
+input,
+textarea {
+  width: 100%;
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 10px;
+  outline: none;
+}
+
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+
+select {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 10px;
+  outline: none;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.listItem {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.listItem.active {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+.listCard {
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.listTitle {
+  font-weight: 650;
+}
+
+/* Admin → Precedents list: align name row with category select + action buttons */
+.precedentListCardRow {
+  align-items: flex-start;
+}
+
+.precedentNameRow {
+  --precedent-name-control-height: 40px;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 4px;
+  min-height: var(--precedent-name-control-height);
+}
+
+.precedentNameRow--edit {
+  width: 100%;
+}
+
+.precedentNameText {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.precedentAdminNameInput {
+  font-weight: 650;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: var(--precedent-name-control-height);
+  height: var(--precedent-name-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.precedentNameEditBtn {
+  flex: 0 0 var(--precedent-name-control-height);
+  width: var(--precedent-name-control-height);
+  min-width: var(--precedent-name-control-height);
+  min-height: var(--precedent-name-control-height);
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  align-self: stretch;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+}
+
+.tr {
+  display: grid;
+  grid-template-columns: 140px 1fr 2fr 1fr 120px;
+  gap: var(--canary-table-row-gap);
+  padding: var(--canary-table-row-padding);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  align-items: center;
+  font-size: var(--canary-table-font-size);
+  line-height: var(--canary-table-line-height);
+}
+
+.tr.rowbtn {
+  min-height: var(--canary-table-row-min-height);
+}
+
+.docsTr {
+  /* Match envelope / mime / folder / pin icons in the description column. */
+  --docs-file-icon-size: calc(18px * 1.2);
+  display: grid;
+  /* Description shrinks; Size / Modified / User stay fixed width (no horizontal scroll on the panel). */
+  grid-template-columns: minmax(0, 1fr) minmax(76px, 76px) minmax(104px, 104px) minmax(92px, 92px);
+  gap: var(--canary-table-row-gap);
+  padding: var(--canary-table-row-padding);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  align-items: start;
+  font-size: var(--canary-table-font-size);
+  line-height: var(--canary-table-line-height);
+}
+
+/* Room for filename + sender subline on filed mail; single-line rows stay vertically centred via .docsDescWrapper. */
+.docsTr.rowbtn {
+  min-height: var(--canary-table-row-min-height);
+}
+
+.docsTr.attachmentChild {
+  /* Visual indent for email-attachments grouped under a parent .eml row. */
+  padding-left: calc(26px * 0.85);
+}
+
+.docsTr > *:first-child {
+  min-width: 0;
+}
+
+/* Single-line description: vertically centre this column vs size/date/user in the row. */
+.docsDescWrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: calc(8px * 0.85);
+  min-width: 0;
+}
+
+.docsDescWrapper:not(.docsDescWrapper--hasSub) {
+  align-self: center;
+}
+
+.docsDescWrapper .docsDescCell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Column flex + base .docsDescCell align-items:center was centring the block horizontally; stretch = left-aligned full width. */
+  align-items: stretch;
+}
+
+.docsDescWrapper--hasSub .docsDescCell {
+  justify-content: flex-start;
+}
+
+.docsMailIconSlot {
+  align-self: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.docsMailGlyph {
+  width: var(--docs-file-icon-size, calc(18px * 1.2));
+  height: var(--docs-file-icon-size, calc(18px * 1.2));
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Distinct from file-image #1ea672 (brighter) and file-office #2f6fed (saturated UI blue) */
+.docsMailGlyph--in {
+  color: #15803d;
+}
+
+.docsMailGlyph--out {
+  color: #1e40af;
+}
+
+.docsTh {
+  background: var(--panel2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.docsTh.docsTr {
+  align-items: center;
+}
+
+/* Keep size / date / user cells vertically centred when the description spans two lines. */
+.docsTr > .td.docsCenter {
+  align-self: center;
+}
+
+.docsDescCell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Two-line description (e.g. mail From): align block to top of the row. */
+.docsDescCell--hasSub {
+  align-items: flex-start;
+}
+
+.docsDescStack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(5px * 0.85);
+  min-width: 0;
+  flex: 1;
+}
+
+.docsDescInner {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * 0.85);
+  min-width: 0;
+  flex: 1;
+}
+
+/* Align second line with filename (past type icons; extra offset when pin column is present). */
+.docsDescCell .docsDescSub {
+  padding-left: calc(var(--docs-file-icon-size, calc(18px * 1.2)) + (6px * 0.85));
+  font-size: 0.84em;
+  line-height: calc(1.35 * 0.85);
+  min-height: calc(1.35em * 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docsDescCell--pinnedHead:not(.docsDescCell--mailRoot) .docsDescSub {
+  padding-left: calc(2 * (var(--docs-file-icon-size, calc(18px * 1.2)) + (6px * 0.85)));
+}
+
+.docsDescCell--mailRoot:not(.docsDescCell--pinnedHead) .docsDescSub {
+  padding-left: 0;
+}
+
+.docsDescCell--mailRoot.docsDescCell--pinnedHead .docsDescSub {
+  padding-left: calc(var(--docs-file-icon-size, calc(18px * 1.2)) + (6px * 0.85));
+}
+
+.docsTypeIcon,
+.docsPinIcon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  width: var(--docs-file-icon-size, calc(18px * 1.2));
+  text-align: center;
+}
+
+/* Filled folder glyph — same yellow in light and dark mode */
+.docsFolderIconWrap {
+  color: #e8c048;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.docsFolderIconSvg {
+  width: calc(18px * 1.2 * 1.15);
+  height: calc(18px * 1.2 * 1.15);
+  display: block;
+}
+
+.docsVimixIcon {
+  width: var(--docs-file-icon-size, calc(18px * 1.2));
+  height: var(--docs-file-icon-size, calc(18px * 1.2));
+  flex-shrink: 0;
+  object-fit: contain;
+  opacity: 1;
+  forced-color-adjust: none;
+}
+
+.docsDescName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.docContextMenu {
+  position: fixed;
+  z-index: 5000;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 170px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
+.docContextSubWrap {
+  position: relative;
+}
+
+/* Invisible hover bridge so pointer can reach the submenu without closing */
+.docContextSubWrap::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 14px;
+  height: 100%;
+  z-index: 1;
+}
+
+.docSubMenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: -4px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 220px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  z-index: 2;
+}
+
+.docContextItem {
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.docContextItem:hover {
+  background: var(--hover);
+}
+
+.docContextItem.docContextItemDisabled {
+  opacity: 0.45;
+  color: var(--muted);
+  cursor: default;
+  pointer-events: none;
+}
+
+.docContextItem.docContextItemDisabled:hover {
+  background: transparent;
+}
+
+.docContextItemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.docMenuChevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  margin-left: 4px;
+}
+
+.th {
+  background: var(--panel2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.thbtn {
+  text-align: left;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.thbtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docsCenter {
+  text-align: center;
+}
+
+.docsTr .thbtn {
+  width: 100%;
+  min-width: 0;
+}
+
+.docsTr .thbtn.docsCenter {
+  text-align: center;
+}
+
+.rowbtn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowbtn:hover {
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.rowbtn.active {
+  background: rgba(var(--primary-rgb), 0.12);
+}
+
+.emailBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #e53935;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.center {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  color: var(--muted);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.caseShell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow-x: hidden;
+  /* Keep the case view within the viewport; scroll inside sidebar / documents only. */
+  overflow-y: hidden;
+  /* Match toolbar row to documents column below */
+  --case-sidebar-width: 360px;
+  --case-main-gap: 12px;
+}
+
+/*
+ * Mirrors .caseGrid: column 1 = sidebar width (Edit details aligns with Case details card);
+ * column 2 = New / Import / Refresh + search, aligned with documents column.
+ */
+.caseToolbar {
+  display: grid;
+  grid-template-columns: var(--case-sidebar-width) 1fr;
+  gap: var(--case-main-gap);
+  align-items: center;
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.caseToolbarLeft {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.caseToolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.caseToolbarMain {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Edit details + New + Import + Refresh stay adjacent; left edge aligns with documents card below */
+.caseToolbarDocs {
+  flex-shrink: 0;
+}
+
+.caseToolbarDropdownWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.caseToolbarDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 160px;
+  z-index: 200;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  padding: 4px 0;
+}
+
+.caseToolbarDropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.caseToolbarDropdownItem:hover {
+  background: var(--hover);
+}
+
+.caseToolbarSearch {
+  flex: 0 1 340px;
+  width: 100%;
+  max-width: 340px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 1100px) {
+  .caseToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .caseToolbarLeft {
+    grid-column: 1;
+  }
+
+  .caseToolbarMain {
+    grid-column: 1;
+    flex-wrap: wrap;
+  }
+
+  .caseToolbarSearch {
+    flex: 1 1 100%;
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+.caseGrid {
+  display: grid;
+  grid-template-columns: var(--case-sidebar-width) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--case-main-gap);
+  /* Same row height, content starts at the top of each column */
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.caseLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Tighter case sidebar so details + contacts fit one viewport when maximised. */
+.caseLeft > .card {
+  padding: 10px 12px;
+}
+
+.caseLeft > .card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.caseLeft > .card .muted {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* Case details: label / value contrast (avoid all-muted body copy). */
+.caseDetailsCard {
+  padding: 12px 14px;
+  background: var(--panel2);
+}
+
+.caseLeft > .card.caseDetailsCard h3 {
+  margin: 0 0 16px;
+}
+
+.caseDetailsList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.caseDetailRow {
+  display: grid;
+  grid-template-columns: minmax(6.75rem, 36%) 1fr;
+  gap: 6px 12px;
+  align-items: start;
+}
+
+.caseDetailRow dt {
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.caseDetailRow dd {
+  margin: 0;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.45;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.caseLeftContactsList {
+  max-height: min(200px, 28vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.caseRight {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.caseDocsCard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.caseDocsScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.accordion {
+  margin-top: 10px;
+}
+
+.accHead {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.accBody {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 10;
+  /* Allow scrolling when a dialog is taller than the viewport (tall forms, small screens). */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(24px, env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.modalOverlay > .modal,
+.modalOverlay > .card.modal {
+  margin-top: max(2vh, 8px);
+  margin-bottom: auto;
+}
+
+/** Pop-out dialogs: drag handle shows grip cursor; surface can be resized (NW–SE) like a desktop window. */
+.modalSurfaceDraggable {
+  resize: both;
+  overflow: auto;
+  min-width: min(100%, 320px);
+  min-height: 180px;
+  max-width: min(960px, 100%);
+  max-height: min(92vh, 900px);
+}
+
+.modalDragHandle {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.modalDragHandle:active {
+  cursor: grabbing;
+}
+
+/*
+ * Floating ONLYOFFICE editor window — draggable and resizable.
+ * Position (top/left/width/height) is set via DOM in useLayoutEffect; only structural styles live here.
+ */
+.ooEditorWindow {
+  display: flex;
+  flex-direction: column;
+  min-width: 400px;
+  min-height: 300px;
+  resize: both;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 32px rgba(15, 23, 42, 0.12);
+}
+
+.ooEditorWindowMaximized {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  resize: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.ooEditorTitleBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  cursor: move;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  height: 28px;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.ooEditorWindowMaximized .ooEditorTitleBar {
+  cursor: default;
+}
+
+.ooEditorTitleErr {
+  flex: 1;
+  font-size: 12px;
+  color: var(--danger, #e55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.ooEditorTitleBtn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.ooEditorTitleBtn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ooEditorTitleBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ooEditorHost {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.ooClosePromptOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000;
+}
+
+.ooClosePromptBox {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 28px;
+  text-align: center;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12);
+}
+
+.ooClosePromptBox p {
+  margin: 0 0 18px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.ooClosePromptBtns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.modal {
+  width: min(720px, 100%);
+}
+
+/* Tall modals: cap height and scroll the body (e.g. Add contact). */
+.modal.modal--scrollBody {
+  max-height: min(88vh, 900px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.modal.modal--scrollBody > .paneHead {
+  flex-shrink: 0;
+}
+
+.modal.modal--scrollBody .modalBodyScroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.field span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Inner height is measured for FullCalendar (pixel height from ResizeObserver). */
+.canaryCalendarInner {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.canaryCalendarInner .fc {
+  flex: 1;
+  min-height: 0;
+}
+
+/* FullCalendar (in-app calendar) — theme aligned with Canary UI */
+.canaryCalendar .fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--panel2);
+  --fc-list-event-hover-bg-color: var(--panel2);
+  --fc-today-bg-color: rgba(var(--primary-rgb), 0.1);
+  --fc-now-indicator-color: var(--primary);
+  /* Use theme surfaces so dark mode is not light text on hard-coded white (see html.dark --panel). */
+  --fc-button-bg-color: var(--panel);
+  --fc-button-border-color: var(--border);
+  --fc-button-text-color: var(--text);
+  --fc-button-hover-bg-color: var(--panel2);
+  --fc-button-active-bg-color: rgba(var(--primary-rgb), 0.18);
+  --fc-event-bg-color: rgba(var(--primary-rgb), 0.9);
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: #fff;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.canaryCalendar .fc .fc-toolbar-title {
+  font-size: 1.15rem;
+}
+
+.canaryCalendar .fc .fc-col-header-cell-cushion,
+.canaryCalendar .fc .fc-daygrid-day-number {
+  color: var(--muted);
+}
+
+.canaryCalendar .fc .fc-daygrid-day.fc-day-today {
+  background: var(--fc-today-bg-color);
+}
+
+/* Category colour fills the whole event chip, not a dot (day grid + list) */
+.canaryCalendar .fc .fc-daygrid-event-dot {
+  display: none !important;
+}
+.canaryCalendar .fc .fc-list-event-dot {
+  display: none !important;
+}
+.canaryCalendar .fc .fc-list-event-graphic {
+  width: 0;
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.canaryCalendar .fc a.fc-daygrid-event.fc-daygrid-dot-event {
+  padding-inline: 4px;
+}
+
+/* Timed events: wrap clock text as (HH:MM) — complements eventTimeFormat 24h */
+.canaryCalendar .fc .fc-daygrid-event:not([data-canary-allday]) .fc-event-time::before,
+.canaryCalendar .fc .fc-timegrid-event:not([data-canary-allday]) .fc-event-time::before {
+  content: '(';
+}
+.canaryCalendar .fc .fc-daygrid-event:not([data-canary-allday]) .fc-event-time::after,
+.canaryCalendar .fc .fc-timegrid-event:not([data-canary-allday]) .fc-event-time::after {
+  content: ')';
+}
+
+/* All-day: hide time column/prefix when marked (see CalendarPage eventDidMount). */
+.canaryCalendar .fc .fc-event[data-canary-allday='1'] .fc-event-time {
+  display: none !important;
+}
+.canaryCalendar .fc tr.fc-list-event[data-canary-allday='1'] td.fc-list-event-time {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+  .caseGrid {
+    grid-template-columns: 1fr;
+    /* Case details natural height; documents fill remaining viewport */
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Ledger standalone tab
+   --------------------------------------------------------------------------- */
+
+.ledgerStandaloneShell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--page-gradient);
+}
+
+.ledgerStandaloneBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
+}
+
+.ledgerStandaloneLogo {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+
+.ledgerStandaloneCase {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ledgerStandaloneTitle {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-left: auto;
+  padding: 3px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ledgerStandaloneBody {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Ledger
+   --------------------------------------------------------------------------- */
+
+.ledgerShell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 0 24px;
+  min-height: 0;
+  flex: 1;
+}
+
+.ledgerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ledgerHeader--ledger {
+  align-items: flex-start;
+}
+
+.ledgerHeader--ledger .ledgerFilterGroup {
+  margin-right: auto;
+}
+
+.ledgerBalances {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ledgerBalanceCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.ledgerBalanceLabel {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ledgerBalanceValue {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ledgerBalanceDr {
+  color: var(--danger);
+}
+
+.ledgerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ledgerFilterGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.ledgerFilterActive {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+}
+
+.ledgerPostBtn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+}
+.ledgerPostBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Hide number spinners where amounts are free-typed (ledger invoice, admin billing). */
+.inputNoSpinner {
+  -moz-appearance: textfield;
+}
+.inputNoSpinner::-webkit-outer-spin-button,
+.inputNoSpinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ledgerBalNeg {
+  color: var(--danger);
+}
+
+.ledgerTableWrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+  box-shadow: var(--shadow);
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.ledgerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ledgerTable--fixed {
+  table-layout: fixed;
+}
+
+.ledgerColDate {
+  width: 96px;
+}
+
+.ledgerColParty {
+  width: 28%;
+}
+
+.ledgerColDebit {
+  width: 11%;
+}
+
+.ledgerColCredit {
+  width: 11%;
+}
+
+.ledgerColDesc {
+  width: auto;
+}
+
+.ledgerColRef {
+  width: 100px;
+}
+
+.ledgerColAcct {
+  width: 88px;
+}
+
+.ledgerTable--fourAmt .ledgerColOfficeDr,
+.ledgerTable--fourAmt .ledgerColOfficeCr,
+.ledgerTable--fourAmt .ledgerColClientDr,
+.ledgerTable--fourAmt .ledgerColClientCr,
+.ledgerTable--fourAmt .ledgerColOfficeBal,
+.ledgerTable--fourAmt .ledgerColClientBal {
+  width: 10%;
+  text-align: right;
+}
+
+.ledgerTable--fourAmt th.ledgerAmtCol {
+  text-align: right;
+}
+
+.ledgerFootTotalsLabel {
+  text-align: right;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ledgerBalanceBand {
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+.ledgerBalanceBand--office {
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.ledgerBalanceBand--client {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+html.dark .ledgerBalanceBand--client {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.ledgerTable--fixed td.ledgerColDesc,
+.ledgerTable--fixed th.ledgerColDesc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledgerTable tfoot td {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel2);
+  font-size: 0.9rem;
+  vertical-align: top;
+}
+
+.ledgerTable tfoot .ledgerFootLabel {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.ledgerTable tfoot .ledgerFootNet td {
+  font-weight: 600;
+}
+
+.ledgerTable th {
+  background: var(--panel2);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.ledgerTable th.ledgerAmtCol {
+  text-align: right;
+}
+
+.ledgerTable td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.ledgerTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ledgerTable tbody tr:hover td {
+  background: var(--hover);
+}
+
+.ledgerAmtCol {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ledgerDateCell {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ledgerRefCell {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ledgerPartyCell {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+
+.ledgerDebitCell {
+  color: var(--danger);
+}
+
+.ledgerCreditCell {
+  color: #16a34a;
+}
+
+.ledgerAcctBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.ledgerAcctBadge--client {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ledgerAcctBadge--office {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+/* Post modal */
+.ledgerPostModal {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ledgerPostTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ledgerPostLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ledgerPostFieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.ledgerPostFieldset legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 4px;
+}
+
+.ledgerRadioLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.ledgerPostActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared debit/credit badge (ledger + finance)
+   --------------------------------------------------------------------------- */
+
+.finDirBadge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.finDirBadge--debit {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.finDirBadge--credit {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* ---------------------------------------------------------------------------
+   Finance page (standalone tab)
+   --------------------------------------------------------------------------- */
+
+/* Finance page (inside modal and standalone) */
+.finShell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 32px;
+}
+
+.finHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.finActions.finActions--modalToolbar {
+  margin-left: auto;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.finTotals {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.finTotalCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.finTotalLabel {
+  font-size: 0.73rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.finTotalValue {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.finTotalDr { color: var(--danger); }
+.finTotalCr { color: #16a34a; }
+
+.finActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finAddCatBtn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+}
+
+.finCategoryBlock {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.05);
+}
+
+.finCategoryHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+}
+
+.finCategoryName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  flex: 1;
+}
+
+.finCategoryTotals {
+  display: flex;
+  gap: 10px;
+  font-size: 0.83rem;
+}
+
+.finCatDeleteBtn {
+  padding: 2px 6px !important;
+  font-size: 0.8rem !important;
+  opacity: 0.6;
+}
+.finCatDeleteBtn:hover:not(:disabled) { opacity: 1; }
+
+.finTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.finTable th {
+  padding: 7px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+
+.finRow td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.finRow:last-child td { border-bottom: none; }
+.finRow:hover td { background: var(--hover); }
+.finRowEditing td { background: rgba(37, 99, 235, 0.03); }
+
+.finAmtCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 110px;
+}
+
+.finActCell {
+  text-align: right;
+  white-space: nowrap;
+  width: 130px;
+}
+
+.finRowBtn {
+  padding: 2px 8px !important;
+  font-size: 0.8rem !important;
+  margin-left: 4px;
+}
+
+.finAddItemRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel2);
+}
+
+.finAddItemBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px !important;
+  font-size: 0.83rem !important;
+  border-radius: 0 !important;
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  background: transparent !important;
+  color: var(--primary) !important;
+}
+.finAddItemBtn:hover:not(:disabled) { background: var(--hover) !important; }
+
+.finAddCatRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Admin Finance template editor
+   --------------------------------------------------------------------------- */
+
+.adminFinanceCat {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.adminFinanceCatHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.adminFinanceCatName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+  color: var(--text);
+}
+
+.adminFinanceCatOrder {
+  font-size: 0.78rem;
+  min-width: 24px;
+  text-align: center;
+}
+
+.adminFinanceItems {
+  display: flex;
+  flex-direction: column;
+}
+
+.adminFinanceItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.adminFinanceItem:last-of-type {
+  border-bottom: none;
+}
+
+.adminFinanceItemName {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.adminFinanceAddItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(37, 99, 235, 0.03);
+  border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
+}
+
+.adminFinanceAddCat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 4px;
+  border-top: 1px dashed var(--border);
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+/* Precedent picker (New → Letter / Document / E-mail) — large dialog (~2× default footprint) */
+.precedentPickerModal {
+  max-width: 1640px;
+  width: min(96vw, 1640px);
+}
+
+.precedentPickerModal .precedentPickerTitle {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.precedentPickerModal .paneHead .muted {
+  font-size: 1.05rem;
+  margin-top: 4px;
+}
+
+.precedentPickerModal .field span {
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.precedentPickerModal .field input[type="search"] {
+  font-size: 1.1rem;
+  padding: 12px 14px;
+}
+
+.precedentPickerModal .btn {
+  font-size: 1.05rem;
+  padding: 10px 18px;
+}
+
+.precedentPickerBody {
+  display: flex;
+  gap: 32px;
+  margin-top: 20px;
+  min-height: 560px;
+  align-items: stretch;
+}
+
+.precedentPickerCats {
+  flex: 0 0 360px;
+  border-right: 1px solid var(--border);
+  padding-right: 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.precedentPickerCatsTitle {
+  font-weight: 650;
+  font-size: 1.05rem;
+  margin-bottom: 14px;
+  color: var(--muted-fg, #64748b);
+}
+
+.precedentPickerCatList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: min(640px, 52vh);
+}
+
+.precedentPickerCatBtn {
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.precedentPickerCatBtn:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.precedentPickerCatBtn.active {
+  border-color: var(--primary, #2563eb);
+  background: rgba(37, 99, 235, 0.12);
+  font-weight: 600;
+}
+
+.precedentPickerMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.precedentPickerActions {
+  justify-content: flex-end;
+  margin-top: 20px;
+  gap: 12px;
+}
+
+.precedentPickerTableHead {
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted-fg, #64748b);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+
+.precedentPickerTableBody {
+  overflow-y: auto;
+  max-height: min(480px, 48vh);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.precedentPickerRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+
+.precedentPickerRow:last-child {
+  border-bottom: none;
+}
+
+.precedentPickerRow.active {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.precedentPickerColPick {
+  flex: 0 0 40px;
+}
+
+.precedentPickerColPick input[type="radio"] {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.precedentPickerColName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.precedentPickerColRef {
+  flex: 0 0 220px;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.precedentPickerEmpty {
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+/* Resizable table headers (main menu, tasks, contacts) */
+.thCell {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.thCell .thbtn {
+  flex: 1;
+  min-width: 0;
+}
+
+.colResizeHandle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+  background: transparent;
+}
+
+.colResizeHandle:hover {
+  background: rgba(var(--primary-rgb), 0.2);
+}
+
+/* Search field + clear */
+.searchInputWrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.searchInputWrap .searchInputField {
+  flex: 1;
+  min-width: 0;
+  padding-right: 36px;
+}
+
+.searchInputClear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.searchInputClear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.caseToolbarSearch.searchInputWrap {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.textPromptModal {
+  resize: both;
+  overflow: auto;
+  min-width: 280px;
+  min-height: 160px;
+}
+
+/* Ledger pending postings */
+.ledgerRow--pending .ledgerAmtCol,
+.ledgerRow--pending .ledgerDateCell,
+.ledgerRow--pending .ledgerPartyCell,
+.ledgerRow--pending .ledgerRefCell {
+  color: var(--muted);
+}
+
+.ledgerPendingDesc {
+  color: var(--muted);
+}
+
+.ledgerApproveBtn {
+  margin-left: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  vertical-align: baseline;
+}
+
+.ledgerTable thead .ledgerThCell {
+  position: relative;
+  padding-right: 8px;
+}
+
+.ledgerTable thead .ledgerThCell .colResizeHandle {
+  top: 2px;
+  bottom: 2px;
+}
+
+/* Case documents — .eml in-app preview (square ~50% viewport; not `.modal` — that caps width at 720px) */
+.modalOverlay.emlPreviewOverlay {
+  align-items: center;
+  justify-content: center;
+  /* Above case toolbar / doc menus (z-index 200+) so the overlay is full-screen and not “boxed” */
+  z-index: 6000;
+}
+
+/* Width/height set in JS (inline) so size isn’t overridden by global `.modal` / layout rules */
+.card.emlPreviewModal {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  flex-grow: 0;
+  padding: 14px 16px 12px;
+  overflow: hidden;
+}
+
+.emlPreviewModalHeader {
+  flex-shrink: 0;
+}
+
+.emlPreviewModalTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.emlPreviewModalPad {
+  padding: 8px 0;
+}
+
+.emlPreviewModalMain {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.emlPreviewModalFooter {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.emlPreviewMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+  flex-shrink: 0;
+  max-height: 28%;
+  overflow: auto;
+  padding: 2px 0;
+}
+
+.emlPreviewMeta dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.emlPreviewMeta dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.emlPreviewBodyWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+html.dark .emlPreviewBodyWrap {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+/* Rendered HTML e-mail (after DOMPurify) */
+.emlPreviewHtml {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.emlPreviewHtml :where(p, div, li) {
+  margin: 0.35em 0;
+}
+
+.emlPreviewHtml :where(p):first-child,
+.emlPreviewHtml :where(div):first-child {
+  margin-top: 0;
+}
+
+.emlPreviewHtml :where(a) {
+  color: var(--link, #2563eb);
+  text-decoration: underline;
+}
+
+.emlPreviewHtml :where(img) {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+.emlPreviewHtml :where(table) {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.emlPreviewHtml :where(td, th) {
+  vertical-align: top;
+}
+
+.emlPreviewHtml :where(blockquote) {
+  margin: 0.5em 0 0.5em 0.8em;
+  padding-left: 0.75em;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.emlPreviewBody {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* E-mail compose: attach from Canary / local */
+.emailAttachCanaryOverlay {
+  z-index: 20;
+}
+
+.emailAttachToolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.emailAttachChips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.emailAttachChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.emailAttachChipName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emailAttachPickerList {
+  max-height: min(360px, 52vh);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  margin-top: 4px;
+}
+
+.emailAttachPickerRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  min-width: 0;
+}
+
+.emailAttachPickerRow:last-child {
+  border-bottom: none;
+}
+
+.emailAttachPickerRow--file {
+  cursor: pointer;
+}
+
+.emailAttachPickerRow--folder {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.emailAttachPickerRow--folder:hover {
+  background: var(--panel2);
+}
+
+.emailAttachPickerCheckSpacer {
+  display: block;
+  width: 14px;
+  height: 1px;
+}

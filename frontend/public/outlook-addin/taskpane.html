@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canary — File to Case</title>
+    <link rel="stylesheet" href="./styles.css?v=1.0.6.2" />
+  </head>
+  <body>
+    <div class="stack">
+      <h1>File to Case</h1>
+
+      <div id="panel-pre-auth" class="panel">
+        <p class="muted" id="intro-text">
+          Use the search box to find a matter, then file the open message. Attachments are saved under the message file in Canary. Sign in once; your session is stored in this add-in for this mailbox.
+        </p>
+        <label class="field">
+          <span>Email</span>
+          <input id="login-email" type="email" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="login-password" type="password" autocomplete="current-password" />
+        </label>
+        <label class="field">
+          <span>2FA code (if enabled)</span>
+          <input id="login-totp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="optional" />
+        </label>
+        <div id="login-err" class="error" style="display: none"></div>
+        <button type="button" id="btn-sign-in" class="primary">Sign in</button>
+      </div>
+
+      <div id="panel-post-auth" class="panel panel-hidden">
+        <div id="auth-status" class="muted"></div>
+
+        <label class="field">
+          <span>Search matters</span>
+          <input
+            type="search"
+            id="case-search"
+            placeholder="Type to search…"
+            disabled
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <div id="case-results" class="case-results" role="listbox" aria-label="Matching matters" hidden></div>
+        <p id="case-selected" class="case-selected muted" hidden></p>
+
+        <label class="field">
+          <span>Description in Canary</span>
+          <textarea id="mail-description" rows="2" maxlength="2000" spellcheck="true"></textarea>
+          <span class="field-hint muted">Used as the saved file name and the subject line inside the .eml file.</span>
+        </label>
+
+        <button type="button" id="btn-file" class="primary" disabled>File this message</button>
+
+        <div id="msg" class="error" style="display: none"></div>
+        <div id="ok" class="ok" style="display: none"></div>
+
+        <button type="button" id="btn-logout" class="btn-block">Sign out</button>
+      </div>
+    </div>
+
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script src="./taskpane.js?v=1.0.6.2"></script>
+  </body>
+</html>

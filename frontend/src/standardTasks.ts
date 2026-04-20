@@ -1,0 +1,2 @@
+/** Matches ``app.standard_tasks.CANARY_FOLLOW_UP_STANDARD_TASK_ID`` and DB seed. */
+export const CANARY_FOLLOW_UP_STANDARD_TASK_ID = 'a0000001-0000-4000-8000-000000000001'

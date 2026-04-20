@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Canary - Outlook add-in (File to Case)
+
+  Default UI origin: https://testing.canarylegalsoftware.co.uk
+  Replace that origin everywhere below for another environment (no trailing slash).
+
+  Schema: outer VersionOverridesV1_0 wraps inner VersionOverridesV1_1 (required for SupportsPinning and matches Microsoft samples).
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+           xsi:type="MailApp">
+  <Id>c4e8f2a1-9b3d-4a7e-8f2c-1d9e3a7b5f6a</Id>
+  <Version>1.0.6.4</Version>
+  <ProviderName>Canary</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Canary - File to Case"/>
+  <Description DefaultValue="Save the selected message and attachments to a Canary matter. Applies an Outlook Canary category after filing (requires mailbox permission)."/>
+  <IconUrl DefaultValue="https://testing.canarylegalsoftware.co.uk/icons/icon32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://testing.canarylegalsoftware.co.uk/icons/icon80.png"/>
+  <SupportUrl DefaultValue="https://testing.canarylegalsoftware.co.uk/"/>
+  <AppDomains>
+    <AppDomain>https://testing.canarylegalsoftware.co.uk</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.8"/>
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://testing.canarylegalsoftware.co.uk/outlook-addin/taskpane.html"/>
+        <RequestedHeight>450</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteMailbox</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Description resid="residAppDesc"/>
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.8">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <FunctionFile resid="functionFile"/>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="canaryGroup">
+                  <Label resid="groupLabel"/>
+                  <Control xsi:type="Button" id="canaryFileToCaseBtn">
+                    <Label resid="buttonLabel"/>
+                    <Supertip>
+                      <Title resid="buttonLabel"/>
+                      <Description resid="buttonTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskPaneUrl"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="icon16" DefaultValue="https://testing.canarylegalsoftware.co.uk/icons/icon16.png"/>
+          <bt:Image id="icon32" DefaultValue="https://testing.canarylegalsoftware.co.uk/icons/icon32.png"/>
+          <bt:Image id="icon80" DefaultValue="https://testing.canarylegalsoftware.co.uk/icons/icon80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="functionFile" DefaultValue="https://testing.canarylegalsoftware.co.uk/outlook-addin/taskpane.html"/>
+          <bt:Url id="taskPaneUrl" DefaultValue="https://testing.canarylegalsoftware.co.uk/outlook-addin/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="groupLabel" DefaultValue="Canary"/>
+          <bt:String id="buttonLabel" DefaultValue="File to Case"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="residAppDesc" DefaultValue="Save the selected message and attachments to a Canary matter, then tag the message with the Canary Outlook category."/>
+          <bt:String id="buttonTip" DefaultValue="Save this message to a Canary matter and apply the Canary category in Outlook."/>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>

@@ -1,0 +1,156 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  margin: 0;
+  padding: 12px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+label.field span {
+  font-size: 12px;
+  color: #444;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+}
+
+.panel-hidden {
+  display: none !important;
+}
+
+.field-hint {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+button.btn-block {
+  display: block;
+  width: calc(100% - 4px);
+  margin: 6px auto 0;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  background: #fff;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #555;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.ok {
+  color: #15803d;
+  font-size: 13px;
+}
+
+.case-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+}
+
+.case-results-empty,
+.case-results-more {
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+button.case-result-row {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 8px 10px;
+}
+
+button.case-result-row:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+button.case-result-row.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.case-selected {
+  margin: 0;
+}

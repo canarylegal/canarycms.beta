@@ -1,0 +1,15 @@
+# Local backup archives (see scripts/backup-canary.sh)
+backups/
+
+.env
+
+# Compiled Python
+__pycache__/
+*.pyc
+
+# Case/user data files
+data/
+
+# Stray artifacts
+backend/=2.8.0
+claudecanary1.txt

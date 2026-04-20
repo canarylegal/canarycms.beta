@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canary sign-in</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="stack">
+      <h1>Sign in to Canary</h1>
+      <p class="muted">Use your Canary account (not your mailbox password unless they are the same).</p>
+      <label class="field">
+        <span>Email</span>
+        <input id="email" type="email" autocomplete="username" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="password" type="password" autocomplete="current-password" />
+      </label>
+      <label class="field">
+        <span>2FA code (if enabled)</span>
+        <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="optional" />
+      </label>
+      <div id="err" class="error" style="display: none"></div>
+      <div class="row">
+        <button type="button" class="primary" id="go">Sign in</button>
+        <button type="button" id="cancel">Cancel</button>
+      </div>
+    </div>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script>
+      function apiRoot() {
+        try {
+          const p = new URLSearchParams(window.location.search || '')
+          const b = (p.get('api') || '').trim()
+          if (b) return b.replace(/\/$/, '')
+        } catch (_) {}
+        const u = new URL(window.location.href)
+        return u.origin + '/api'
+      }
+
+      function showErr(msg) {
+        const el = document.getElementById('err')
+        el.style.display = msg ? 'block' : 'none'
+        el.textContent = msg || ''
+      }
+
+      function closeWith(payload) {
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify(payload))
+        }
+      }
+
+      Office.onReady(() => {
+        document.getElementById('cancel').onclick = () => closeWith({ ok: false, cancelled: true })
+        document.getElementById('go').onclick = async () => {
+          showErr('')
+          const email = document.getElementById('email').value.trim()
+          const password = document.getElementById('password').value
+          const totp = document.getElementById('totp').value.trim()
+          if (!email || !password) {
+            showErr('Email and password are required.')
+            return
+          }
+          try {
+            const res = await fetch(apiRoot() + '/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                password,
+                totp_code: totp || null,
+              }),
+            })
+            const body = await res.json().catch(() => null)
+            if (!res.ok) {
+              const detail = body && typeof body === 'object' && body.detail
+              const msg =
+                typeof detail === 'string'
+                  ? detail
+                  : res.status === 401
+                    ? 'Invalid credentials or 2FA required.'
+                    : 'Sign-in failed.'
+              showErr(msg)
+              return
+            }
+            const token = body && body.access_token
+            if (!token) {
+              showErr('No access token returned.')
+              return
+            }
+            closeWith({ ok: true, access_token: token })
+          } catch (e) {
+            showErr(e && e.message ? String(e.message) : 'Network error.')
+          }
+        }
+      })
+    </script>
+  </body>
+</html>
