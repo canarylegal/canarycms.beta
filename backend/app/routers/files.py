@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import mimetypes
 import os
@@ -94,6 +95,10 @@ def _onlyoffice_types_for_file(original_filename: str) -> tuple[str, str] | None
     if ext in {"ppt", "pptx", "pps", "ppsx", "odp"}:
         return ("slide", ext)
     return None
+
+
+def _normalized_file_suffix(name: str) -> str:
+    return Path(name).suffix.lower()
 
 
 # Old binary formats that share an extension with their newer OOXML equivalents.
@@ -979,6 +984,13 @@ def rename_case_file(
     new_name = Path(payload.original_filename).name
     if not new_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid filename")
+    old_ext = _normalized_file_suffix(row.original_filename or "")
+    new_ext = _normalized_file_suffix(new_name)
+    if old_ext != new_ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Renaming cannot change the file extension.",
+        )
 
     ensure_files_root()
     from app.file_storage import FILES_ROOT
@@ -1457,6 +1469,7 @@ async def oo_force_save(
     row = db.get(DbFile, file_id)
     if not row or row.case_id != case_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    previous_version = row.version or 1
 
     secret = (os.getenv("ONLYOFFICE_JWT_SECRET") or "").strip()
     oo_internal = (os.getenv("ONLYOFFICE_DS_INTERNAL_URL") or "http://onlyoffice").strip().rstrip("/")
@@ -1471,6 +1484,9 @@ async def oo_force_save(
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(cmd_url, json={**cmd_body, "token": token_str})
             resp.raise_for_status()
+            body = resp.json()
+            if int(body.get("error", 1)) != 0:
+                raise RuntimeError(f"CommandService error={body.get('error')}")
         log.info("oo_force_save: issued force-save for file %s doc_key=%s", file_id, doc_key)
     except Exception as exc:
         log.warning("oo_force_save: command service failed for file %s: %s", file_id, exc)
@@ -1478,6 +1494,17 @@ async def oo_force_save(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Force-save command failed — is the ONLYOFFICE service running?",
         )
+
+    # Wait for ONLYOFFICE callback (status=6) to persist bytes.
+    for _ in range(40):
+        await asyncio.sleep(0.5)
+        db.refresh(row)
+        if (row.version or 1) > previous_version:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail="Force-save timed out before the document was written. Keep the editor open and retry Save & Close.",
+    )
 
 
 @router.post("/{file_id}/publish-compose", status_code=status.HTTP_204_NO_CONTENT)

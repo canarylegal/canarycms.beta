@@ -3507,20 +3507,27 @@ export function CaseDetail({
                       className="docContextItem"
                       onClick={() => {
                         setDocMenu(null)
+                        const originalName = f.original_filename.trim()
+                        const extIdx = originalName.lastIndexOf('.')
+                        const hasEditableExt = extIdx > 0 && extIdx < originalName.length - 1
+                        const lockedExt = hasEditableExt ? originalName.slice(extIdx) : ''
+                        const initialBase = hasEditableExt ? originalName.slice(0, extIdx) : originalName
                         setTextPrompt({
-                          title: 'Rename file',
-                          initial: f.original_filename,
+                          title: lockedExt ? `Rename file (extension ${lockedExt} is fixed)` : 'Rename file',
+                          initial: initialBase,
                           confirmLabel: 'Rename',
                           onConfirm: (newName) => {
-                            const trimmed = newName.trim()
+                            const trimmedBase = newName.trim()
                             setTextPrompt(null)
-                            if (!trimmed || trimmed === f.original_filename) return
+                            if (!trimmedBase) return
+                            const finalName = `${trimmedBase}${lockedExt}`
+                            if (finalName === f.original_filename) return
                             setBusy(true)
                             setActionErr(null)
                             apiFetch(`/cases/${caseId}/files/${f.id}/rename`, {
                               token,
                               method: 'PATCH',
-                              json: { original_filename: trimmed },
+                              json: { original_filename: finalName },
                             })
                               .then(() => onRefresh())
                               .catch((e: any) => setActionErr(e?.message ?? 'Failed to rename file'))

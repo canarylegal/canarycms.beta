@@ -6,6 +6,7 @@ import mimetypes
 import os
 import secrets
 import shutil
+import asyncio
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -308,6 +309,56 @@ def get_precedent_onlyoffice_config(
         document_type=doc_type,
         document=browser_document,
         editor_config=jwt_payload["editorConfig"],
+    )
+
+
+@router.post("/{precedent_id}/oo-force-save", status_code=status.HTTP_204_NO_CONTENT)
+async def oo_force_save_precedent(
+    precedent_id: uuid.UUID,
+    doc_key: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    p = db.get(Precedent, precedent_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Precedent not found")
+    row = db.get(DbFile, p.file_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Precedent file missing")
+    previous_version = row.version or 1
+
+    import jwt as pyjwt
+    import httpx
+
+    secret = (os.getenv("ONLYOFFICE_JWT_SECRET") or "").strip()
+    oo_internal = (os.getenv("ONLYOFFICE_DS_INTERNAL_URL") or "http://onlyoffice").strip().rstrip("/")
+    cmd_url = f"{oo_internal}/coauthoring/CommandService.ashx"
+    cmd_body: dict = {"c": "forcesave", "key": doc_key}
+    token_str = pyjwt.encode(cmd_body, secret, algorithm="HS256")
+    if isinstance(token_str, bytes):
+        token_str = token_str.decode("utf-8")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(cmd_url, json={**cmd_body, "token": token_str})
+            resp.raise_for_status()
+            body = resp.json()
+            if int(body.get("error", 1)) != 0:
+                raise RuntimeError(f"CommandService error={body.get('error')}")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Force-save command failed — is the ONLYOFFICE service running?",
+        ) from exc
+
+    for _ in range(40):
+        await asyncio.sleep(0.5)
+        db.refresh(row)
+        if (row.version or 1) > previous_version:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail="Force-save timed out before the template was written. Keep the editor open and retry Save & Close.",
     )
 
 

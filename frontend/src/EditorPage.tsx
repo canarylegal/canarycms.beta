@@ -199,6 +199,10 @@ export default function EditorPage() {
   async function handleSaveAndClose() {
     if (!params || !cfg || saving) return
     const docKey = (cfg.document as { key?: string }).key ?? ''
+    if (!docKey) {
+      setErr('Editor key missing; cannot save safely. Please reload and try again.')
+      return
+    }
     setSaving(true)
     try {
       if (params.mode === 'case') {
@@ -206,7 +210,6 @@ export default function EditorPage() {
           `/cases/${params.caseId}/files/${params.fileId}/oo-force-save?doc_key=${encodeURIComponent(docKey)}`,
           { method: 'POST', token },
         )
-        await new Promise<void>((r) => setTimeout(r, 2500))
         await apiFetch(`/cases/${params.caseId}/files/${params.fileId}/publish-compose`, {
           method: 'POST',
           token,
@@ -221,13 +224,17 @@ export default function EditorPage() {
         }
         signalCaseFilesChanged(params.caseId)
       } else {
-        // Precedents: just close — OO DS will callback with status=2 and save
-        await new Promise<void>((r) => setTimeout(r, 1000))
+        await apiFetch(
+          `/precedents/${params.precedentId}/oo-force-save?doc_key=${encodeURIComponent(docKey)}`,
+          { method: 'POST', token },
+        )
       }
-    } catch {
-      // If force-save fails, closing will still trigger status=2 callback
+      window.close()
+    } catch (e: unknown) {
+      setErr((e as { message?: string }).message ?? 'Save failed. Keep this window open and try again.')
+    } finally {
+      setSaving(false)
     }
-    window.close()
   }
 
   async function handleDiscard() {
