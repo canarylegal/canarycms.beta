@@ -108,13 +108,19 @@ services:
       [
         "/bin/sh",
         "-c",
-        'mkdir -p /data/collections && (test -f /data/users || touch /data/users) && exec docker-entrypoint.sh /venv/bin/radicale --config /config/config',
+        'mkdir -p /data/collections && (test -f /data/users || touch /data/users) && exec docker-entrypoint.sh /usr/bin/radicale --config /config/config',
       ]
     volumes:
       - ./radicale/config:/config:ro
       - radicale-data:/data
     ports:
       - "${RADICALE_PORT_PUBLISH:-0.0.0.0:5232:5232}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5232/ -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   onlyoffice:
     image: onlyoffice/documentserver:7.5

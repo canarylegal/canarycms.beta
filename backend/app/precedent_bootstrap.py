@@ -189,6 +189,10 @@ def apply_precedent_seed_if_empty(db: Session) -> bool:
                     updated_at=now,
                 )
             )
+            pc = db.get(PrecedentCategory, cid)
+            ms_id = pc.matter_sub_type_id if pc else None
+            sub = db.get(MatterSubType, ms_id) if ms_id else None
+            mh_id = sub.head_type_id if sub else None
             db.add(
                 Precedent(
                     id=prec_id,
@@ -196,6 +200,8 @@ def apply_precedent_seed_if_empty(db: Session) -> bool:
                     reference=(p.get("reference") or "SEED")[:200],
                     kind=kind,
                     file_id=file_id,
+                    matter_head_type_id=mh_id,
+                    matter_sub_type_id=ms_id,
                     category_id=cid,
                     created_at=now,
                     updated_at=now,

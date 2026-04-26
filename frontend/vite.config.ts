@@ -73,7 +73,7 @@ console.log(
 
 /*
  * Production (no Vite): your reverse proxy must forward the same paths to Document Server:
- *   /office-ds, /coauthoring, /doc, /web-apps, /sdkjs, /sdkjs-plugins, /fonts, /dictionaries, /cache,
+ *   /office-ds, /coauthoring, /doc, /web-apps, /sdkjs, /sdkjs-plugins, /fonts, /dictionaries, /cache, /printfile,
  *   /ConvertService.ashx, and paths starting with /\\d+.\\d+.\\d+ (versioned DS assets).
  * Set X-Forwarded-Host and X-Forwarded-Proto on those proxies so ONLYOFFICE builds correct URLs.
  */
@@ -269,6 +269,20 @@ export default defineConfig({
             }
           }
           proxy.on('proxyReq', _setForwardedHost)
+        },
+      },
+      '/printfile': {
+        target: onlyofficeTarget,
+        changeOrigin: false,
+        configure(proxy) {
+          logProxyUpstreamErrors(proxy, '/printfile', onlyofficeTarget)
+          proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            const host = req.headers?.host as string | undefined
+            if (host) {
+              proxyReq.setHeader('X-Forwarded-Host', host)
+              proxyReq.setHeader('X-Forwarded-Proto', 'http')
+            }
+          })
         },
       },
       // Print / conversion requests from the editor sometimes hit these at the dev origin root.

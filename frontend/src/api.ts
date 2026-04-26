@@ -179,7 +179,13 @@ export async function apiFetch<T>(
       if (!isLoginAttempt) {
         // Token likely expired/was invalidated; force re-login.
         localStorage.removeItem('token')
-        if (typeof window !== 'undefined') window.location.reload()
+        // Editor runs in its own tab — reloading here produces a blank loop and hides the error. User can close and re-open from the main app.
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/editor/')
+        ) {
+          window.location.reload()
+        }
       }
     }
     const body = await parseJsonSafe(res)

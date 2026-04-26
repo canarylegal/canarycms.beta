@@ -103,6 +103,9 @@ export default function EditorPage() {
   const [pdfExportBusy, setPdfExportBusy] = useState(false)
   const apiRef = useRef<DocsApiEditor | null>(null)
   const pdfExportTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  /** After downloadAs('pdf'): open PDF in new tab (export) vs Canary print-ui tab (print). */
+  const pendingDownloadAsRef = useRef<'export' | 'print' | null>(null)
+  const printTabRef = useRef<Window | null>(null)
   const token = localStorage.getItem('token') ?? undefined
 
   // Fetch editor config on mount
@@ -116,11 +119,13 @@ export default function EditorPage() {
       : `/cases/${params.caseId}/files/${params.fileId}/onlyoffice-config`
     apiFetch<OoConfig>(configUrl, { token })
       .then((data) => {
+        setErr(null)
         setCfg(data)
         setFilename((data.document as { title?: string }).title ?? '')
       })
       .catch((e: unknown) => {
-        setErr((e as { message?: string }).message ?? 'Could not load editor config')
+        const m = (e as { message?: string }).message?.trim()
+        setErr(m || 'Could not load editor config')
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -133,6 +138,52 @@ export default function EditorPage() {
       document.title = previous
     }
   }, [filename])
+
+  // Host Ctrl/Cmd+P → Canary print path (same as toolbar Print); avoids ONLYOFFICE /printfile PDF MIME issues.
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const isP = ev.key === 'p' || ev.key === 'P'
+      if (!isP || ev.altKey) return
+      if (!ev.ctrlKey && !ev.metaKey) return
+      if (!cfg || !apiRef.current?.downloadAs || pdfExportBusy || saving || discarding) return
+      ev.preventDefault()
+      const w = window.open(
+        'about:blank',
+        'canary_oo_print',
+        'popup=yes,width=1080,height=1440,left=60,top=40',
+      )
+      printTabRef.current = w
+      if (!w) {
+        setErr('Print needs a new window — allow pop-ups for this site, then try again.')
+        return
+      }
+      pendingDownloadAsRef.current = 'print'
+      setPdfExportBusy(true)
+      if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
+      pdfExportTimeoutRef.current = window.setTimeout(() => {
+        pdfExportTimeoutRef.current = undefined
+        pendingDownloadAsRef.current = null
+        printTabRef.current = null
+        setPdfExportBusy(false)
+      }, 120_000)
+      try {
+        apiRef.current.downloadAs('pdf')
+      } catch {
+        if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
+        pdfExportTimeoutRef.current = undefined
+        pendingDownloadAsRef.current = null
+        printTabRef.current = null
+        setPdfExportBusy(false)
+        try {
+          w.close()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [cfg, pdfExportBusy, saving, discarding])
 
   // Initialise OO DS editor once config is available
   useEffect(() => {
@@ -151,7 +202,8 @@ export default function EditorPage() {
           return
         }
         apiRef.current?.destroyEditor?.()
-        apiRef.current = new g.DocsAPI.DocEditor('oo-editor-page', {
+        try {
+          apiRef.current = new g.DocsAPI.DocEditor('oo-editor-page', {
           documentServerUrl: `${base.replace(/\/$/, '')}/`,
           token: cfg.token,
           document: cfg.document,
@@ -169,7 +221,7 @@ export default function EditorPage() {
               console.error('[ONLYOFFICE onError] RAW:', raw)
               if (active) setErr(`${formatOoError(event)} | raw: ${raw}`)
             },
-            // Required for downloadAs(); used by "Export PDF" when built-in print preview fails under Vite.
+            // Required for downloadAs(); Canary Print + Export PDF both use conversion URLs under /cache/files/.
             onDownloadAs: (event: unknown) => {
               if (pdfExportTimeoutRef.current !== undefined) {
                 clearTimeout(pdfExportTimeoutRef.current)
@@ -177,16 +229,69 @@ export default function EditorPage() {
               }
               const e = event as { data?: { url?: string; fileType?: string } }
               const url = e?.data?.url
-              if (typeof url === 'string' && url.length > 0) {
+              const mode = pendingDownloadAsRef.current
+              pendingDownloadAsRef.current = null
+              const printWin = printTabRef.current
+              printTabRef.current = null
+
+              if (mode === 'print') {
+                if (typeof url === 'string' && url.length > 0 && printWin && token) {
+                  void (async () => {
+                    try {
+                      const r = await apiFetch<{ sid: string; t: string }>('/onlyoffice/print-stage', {
+                        method: 'POST',
+                        token,
+                        json: { browser_url: url },
+                      })
+                      const next = new URL('/oo-print', window.location.origin)
+                      next.searchParams.set('sid', r.sid)
+                      next.searchParams.set('t', r.t)
+                      printWin.location.replace(next.href)
+                    } catch (err: unknown) {
+                      const msg =
+                        (err as { message?: string }).message ??
+                        'Print staging failed. Try Export PDF instead.'
+                      try {
+                        printWin.document.body.textContent = msg
+                      } catch {
+                        printWin.close()
+                      }
+                    } finally {
+                      setPdfExportBusy(false)
+                    }
+                  })()
+                  return
+                }
+                try {
+                  printWin?.close()
+                } catch {
+                  /* ignore */
+                }
+                if (!token) setErr('Sign in again to print.')
+                else if (!url) setErr('ONLYOFFICE did not return a PDF URL for print.')
+                setPdfExportBusy(false)
+                return
+              }
+
+              if (typeof url === 'string' && url.length > 0 && mode === 'export') {
                 window.open(url, '_blank', 'noopener,noreferrer')
               }
               setPdfExportBusy(false)
             },
           },
         })
+        } catch (boot: unknown) {
+          if (active) {
+            const m = (boot as Error).message?.trim()
+            setErr(m || 'Failed to start ONLYOFFICE editor (see browser console).')
+          }
+        }
       })
       .catch((e: unknown) => {
-        if (active) setErr((e as { message?: string }).message ?? 'Failed to load ONLYOFFICE')
+        if (active) {
+          const m = (e as { message?: string }).message?.trim()
+          setErr(m || 'Failed to load ONLYOFFICE')
+        }
       })
 
     return () => {
@@ -306,13 +411,26 @@ export default function EditorPage() {
         </span>
         <button
           type="button"
-          title="If File → Print preview stays on Loading, export a PDF and print from your viewer."
+          title="Opens a print dialog via HTML preview (works when the browser treats ONLYOFFICE PDFs as downloads)."
           onClick={() => {
-            if (pdfExportBusy || !apiRef.current?.downloadAs) return
+            if (pdfExportBusy || !apiRef.current?.downloadAs || !cfg) return
+            const w = window.open(
+              'about:blank',
+              'canary_oo_print',
+              'popup=yes,width=1080,height=1440,left=60,top=40',
+            )
+            printTabRef.current = w
+            if (!w) {
+              setErr('Print needs a new window — allow pop-ups for this site, then try again.')
+              return
+            }
+            pendingDownloadAsRef.current = 'print'
             setPdfExportBusy(true)
             if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
             pdfExportTimeoutRef.current = window.setTimeout(() => {
               pdfExportTimeoutRef.current = undefined
+              pendingDownloadAsRef.current = null
+              printTabRef.current = null
               setPdfExportBusy(false)
             }, 120_000)
             try {
@@ -320,6 +438,51 @@ export default function EditorPage() {
             } catch {
               if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
               pdfExportTimeoutRef.current = undefined
+              pendingDownloadAsRef.current = null
+              printTabRef.current = null
+              setPdfExportBusy(false)
+              try {
+                w.close()
+              } catch {
+                /* ignore */
+              }
+            }
+          }}
+          disabled={pdfExportBusy || saving || discarding || !cfg}
+          style={{
+            background: 'rgba(15,23,42,0.06)',
+            border: '1px solid rgba(15,23,42,0.15)',
+            color: '#334155',
+            cursor: pdfExportBusy || saving || discarding || !cfg ? 'default' : 'pointer',
+            fontSize: 12,
+            padding: '3px 10px',
+            borderRadius: 4,
+            flexShrink: 0,
+            opacity: pdfExportBusy || saving || discarding || !cfg ? 0.5 : 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {pdfExportBusy ? 'Preparing…' : 'Print'}
+        </button>
+        <button
+          type="button"
+          title="Download ONLYOFFICE’s PDF in a new tab (browser PDF handler)."
+          onClick={() => {
+            if (pdfExportBusy || !apiRef.current?.downloadAs) return
+            pendingDownloadAsRef.current = 'export'
+            setPdfExportBusy(true)
+            if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
+            pdfExportTimeoutRef.current = window.setTimeout(() => {
+              pdfExportTimeoutRef.current = undefined
+              pendingDownloadAsRef.current = null
+              setPdfExportBusy(false)
+            }, 120_000)
+            try {
+              apiRef.current.downloadAs('pdf')
+            } catch {
+              if (pdfExportTimeoutRef.current !== undefined) clearTimeout(pdfExportTimeoutRef.current)
+              pdfExportTimeoutRef.current = undefined
+              pendingDownloadAsRef.current = null
               setPdfExportBusy(false)
             }
           }}

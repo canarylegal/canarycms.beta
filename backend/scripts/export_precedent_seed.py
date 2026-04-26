@@ -69,8 +69,13 @@ def main() -> None:
         precedents_out: list[dict] = []
         for i, p in enumerate(prec_rows):
             f = db.get(DbFile, p.file_id)
+            if not f:
+                continue
+            if not p.category_id:
+                print(f"skip export (global/sub-wide scope, no single category): {p.name!r}", file=sys.stderr)
+                continue
             cat = db.get(PrecedentCategory, p.category_id)
-            if not f or not cat:
+            if not cat:
                 continue
             sub = db.get(MatterSubType, cat.matter_sub_type_id)
             head = db.get(MatterHeadType, sub.head_type_id) if sub else None

@@ -666,18 +666,37 @@ export function CaseDetail({
       return
     }
     const subId = caseDetail?.matter_sub_type_id
-    if (!subId) {
-      setPrecedentCategories([])
-      setPrecedentChoices([])
-      setPrecedentPickerCategoryId(null)
-      setPrecedentChosenId(null)
-      setPrecedentSearch('')
-      return
-    }
+    const headOnlyId = caseDetail?.matter_head_type_id
     const kind = precedentPicker.kind
     let cancelled = false
     async function load() {
       try {
+        if (!subId) {
+          if (headOnlyId) {
+            const list = await apiFetch<PrecedentOut[]>(
+              `/precedents?kind=${kind}&matter_head_type_id=${headOnlyId}`,
+              { token },
+            )
+            if (cancelled) return
+            setPrecedentCategories([])
+            setPrecedentChoices(list)
+            setPrecedentChosenId(null)
+            setPrecedentSearch('')
+            setPrecedentPickerCategoryId(null)
+            return
+          }
+          const list = await apiFetch<PrecedentOut[]>(
+            `/precedents?kind=${kind}&global_precedents_only=true`,
+            { token },
+          )
+          if (cancelled) return
+          setPrecedentCategories([])
+          setPrecedentChoices(list)
+          setPrecedentChosenId(null)
+          setPrecedentSearch('')
+          setPrecedentPickerCategoryId(null)
+          return
+        }
         const [cats, list] = await Promise.all([
           apiFetch<PrecedentCategoryOut[]>(`/matter-types/sub-types/${subId}/precedent-categories`, { token }),
           apiFetch<PrecedentOut[]>(`/precedents?kind=${kind}&matter_sub_type_id=${subId}`, { token }),
@@ -700,17 +719,38 @@ export function CaseDetail({
     return () => {
       cancelled = true
     }
-  }, [precedentPicker, token, caseDetail?.matter_sub_type_id, caseDetail?.id])
+  }, [precedentPicker, token, caseDetail?.matter_sub_type_id, caseDetail?.matter_head_type_id, caseDetail?.id])
 
   const filteredPrecedentChoices = useMemo(() => {
-    if (precedentPickerCategoryId === null) return []
-    const base = precedentChoices.filter((p) => p.category_id === precedentPickerCategoryId)
-    const s = precedentSearch.trim().toLowerCase()
-    if (!s) return base
-    return base.filter(
-      (p) => p.name.toLowerCase().includes(s) || p.reference.toLowerCase().includes(s),
+    const headOnly =
+      !!caseDetail && !caseDetail.matter_sub_type_id && !!caseDetail.matter_head_type_id
+    const subNoCategories =
+      !!caseDetail?.matter_sub_type_id && precedentCategories.length === 0
+    const filterBySearch = (rows: PrecedentOut[]) => {
+      const s = precedentSearch.trim().toLowerCase()
+      if (!s) return rows
+      return rows.filter(
+        (p) => p.name.toLowerCase().includes(s) || p.reference.toLowerCase().includes(s),
+      )
+    }
+    if (headOnly || subNoCategories) {
+      return filterBySearch(precedentChoices)
+    }
+    if (precedentPickerCategoryId === null) {
+      return precedentChoices
+    }
+    const base = precedentChoices.filter(
+      (p) => !p.category_id || p.category_id === precedentPickerCategoryId,
     )
-  }, [precedentChoices, precedentPickerCategoryId, precedentSearch])
+    return filterBySearch(base)
+  }, [
+    precedentChoices,
+    precedentPickerCategoryId,
+    precedentSearch,
+    precedentCategories.length,
+    caseDetail?.matter_sub_type_id,
+    caseDetail?.matter_head_type_id,
+  ])
 
   const filteredFiles = useMemo(() => {
     const s = docSearch.trim().toLowerCase()
@@ -2526,9 +2566,9 @@ export function CaseDetail({
                 <div>
                   <h2 className="precedentPickerTitle">Precedent</h2>
                   <div className="muted">Choose a category, then a template — or blank.</div>
-                  {!caseDetail?.matter_sub_type_id ? (
+                  {!caseDetail?.matter_sub_type_id && !caseDetail?.matter_head_type_id ? (
                     <div className="muted" style={{ marginTop: 4 }}>
-                      This case has no matter sub-type; precedents are filtered by sub-type.
+                      This case has no matter type set — only precedents that apply to all cases are available.
                     </div>
                   ) : null}
                 </div>
@@ -2540,19 +2580,32 @@ export function CaseDetail({
                 <div className="precedentPickerCats">
                   <div className="precedentPickerCatsTitle">Category</div>
                   <div className="precedentPickerCatList">
-                    {precedentCategories.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`precedentPickerCatBtn ${precedentPickerCategoryId === c.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setPrecedentPickerCategoryId(c.id)
-                          setPrecedentChosenId(null)
-                        }}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
+                    {caseDetail?.matter_sub_type_id ? (
+                      precedentCategories.length > 0 ? (
+                        precedentCategories.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={`precedentPickerCatBtn ${precedentPickerCategoryId === c.id ? 'active' : ''}`}
+                            onClick={() => {
+                              setPrecedentPickerCategoryId(c.id)
+                              setPrecedentChosenId(null)
+                            }}
+                          >
+                            {c.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="muted" style={{ padding: '8px 0' }}>
+                          No categories — head / sub-wide templates below (add categories under Admin → Matters to group
+                          further).
+                        </div>
+                      )
+                    ) : caseDetail?.matter_head_type_id ? (
+                      <div className="muted" style={{ padding: '8px 0' }}>
+                        All templates for {caseDetail.matter_head_type_name ?? 'this matter type'}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="precedentPickerMain">
@@ -2564,22 +2617,21 @@ export function CaseDetail({
                       onChange={(e) => setPrecedentSearch(e.target.value)}
                       onClear={() => setPrecedentSearch('')}
                       disabled={
-                        !caseDetail?.matter_sub_type_id ||
-                        precedentCategories.length === 0 ||
-                        precedentPickerCategoryId === null
+                        (!caseDetail?.matter_sub_type_id && !caseDetail?.matter_head_type_id) ||
+                        (!!caseDetail?.matter_sub_type_id &&
+                          precedentCategories.length > 0 &&
+                          precedentPickerCategoryId === null)
                       }
                       aria-label="Search precedents"
                     />
                   </label>
-                  {!caseDetail?.matter_sub_type_id ? (
+                  {!caseDetail?.matter_sub_type_id && !caseDetail?.matter_head_type_id ? (
                     <div className="muted precedentPickerEmpty">
-                      Set a matter sub-type on this case to choose precedents. Categories are configured per sub-type under Admin → Matters.
+                      Set a matter type on this case (practice head or sub-type) to use scoped precedents.
                     </div>
-                  ) : precedentCategories.length === 0 ? (
-                    <div className="muted precedentPickerEmpty">
-                      No precedent categories for this matter sub-type yet. An administrator can add them under Admin → Matters.
-                    </div>
-                  ) : precedentPickerCategoryId === null ? (
+                  ) : caseDetail?.matter_sub_type_id &&
+                    precedentCategories.length > 0 &&
+                    precedentPickerCategoryId === null ? (
                     <div className="muted precedentPickerEmpty">
                       Select a category on the left.
                     </div>
@@ -3770,9 +3822,11 @@ export function CaseDetail({
                           method: 'PATCH',
                           json: {
                             matter_description: editMatterDescription.trim(),
-                            matter_sub_type_id: editPracticeArea || null,
                             fee_earner_user_id: editFeeEarner || null,
                             status: editCaseStatus,
+                            ...(editPracticeArea.trim()
+                              ? { matter_sub_type_id: editPracticeArea.trim() }
+                              : { matter_sub_type_id: null, matter_head_type_id: null }),
                           },
                         })
                         setCaseEditOpen(false)

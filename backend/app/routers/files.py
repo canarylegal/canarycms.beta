@@ -72,7 +72,9 @@ _ONLYOFFICE_DOC_PERMISSIONS: dict[str, bool] = {
     "fillForms": True,
     "modifyContentControl": True,
     "modifyFilter": True,
-    "print": True,
+    # Hide DS File → Print (Firefox treats /printfile/… PDF as download handler). Canary Print uses
+    # downloadAs('pdf') + /onlyoffice/print-ui instead; keep download: True for that pipeline.
+    "print": False,
     "review": True,
 }
 

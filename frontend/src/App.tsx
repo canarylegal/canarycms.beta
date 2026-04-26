@@ -14,7 +14,7 @@ import { CASE_FILES_STORAGE_KEY, signalCaseFilesChanged } from './caseFilesCross
 import { CaseDetail } from './case/CaseDetail'
 import { matterContactTypeLabel } from './case/matterLabels'
 import { CASE_MENU_OPTIONS } from './caseMenuOptions'
-import { apiFetch, apiUrl } from './api'
+import { apiFetch, apiUrl, formatApiErrorDetail } from './api'
 import {
   ACCENT_COLOR_PRESETS,
   DEFAULT_ACCENT,
@@ -31,7 +31,7 @@ import { SearchInput } from './SearchInput'
 import type { ApiError } from './api'
 import { copyTextToClipboard } from './copyToClipboard'
 import { canaryDocumentTitle } from './tabTitle'
-import { caseHasRevokedUserAccess, formatCaseStatusLabel } from './types'
+import { caseHasRevokedUserAccess, formatCaseStatusLabel, GLOBAL_PRECEDENT_SCOPE } from './types'
 import type {
   AdminAuditEvent,
   CaseContactOut,
@@ -44,7 +44,6 @@ import type {
   MatterContactTypeOut,
   MatterHeadTypeOut,
   MatterSubTypeOut,
-  PrecedentCategoryFlatOut,
   PrecedentCategoryOut,
   PrecedentOut,
   TokenResponse,
@@ -1088,7 +1087,6 @@ function NewMatterModal({
               onChange={(e) => {
                 const id = e.target.value
                 setPracticeArea(id)
-                // Pre-fill Description with the sub type's prefix (if configured)
                 const sub = matterHeadTypes.flatMap((h) => h.sub_types).find((s) => s.id === id)
                 setMatterDescription(sub?.prefix ?? '')
               }}
@@ -1348,8 +1346,8 @@ function NewMatterModal({
                         token,
                         json: {
                           matter_description: matterDescription.trim(),
-                          matter_sub_type_id: practiceArea || null,
                           status: newMatterStatus,
+                          matter_sub_type_id: practiceArea || null,
                         },
                       })
                       if (feeEarner) {
@@ -2780,10 +2778,14 @@ function AdminPrecedents({ token }: { token: string }) {
   const { askConfirm } = useDialogs()
   const [items, setItems] = useState<PrecedentOut[]>([])
   const [matterHeads, setMatterHeads] = useState<MatterHeadTypeOut[]>([])
-  const [flatCats, setFlatCats] = useState<PrecedentCategoryFlatOut[]>([])
   const [uploadHeadTypeId, setUploadHeadTypeId] = useState('')
   const [uploadSubTypeId, setUploadSubTypeId] = useState('')
   const [uploadCats, setUploadCats] = useState<PrecedentCategoryOut[]>([])
+  const [uploadCatsLoading, setUploadCatsLoading] = useState(false)
+  const [uploadCatsFetchErr, setUploadCatsFetchErr] = useState<string | null>(null)
+  /** Specific category id, or GLOBAL_PRECEDENT_SCOPE for “all categories under sub-type”. */
+  const [uploadCategoryId, setUploadCategoryId] = useState(GLOBAL_PRECEDENT_SCOPE)
+  const [fileInputKey, setFileInputKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -2801,46 +2803,56 @@ function AdminPrecedents({ token }: { token: string }) {
   )
 
   const uploadSubTypeOptions = useMemo(() => {
-    if (!uploadHeadTypeId) return []
+    if (!uploadHeadTypeId || uploadHeadTypeId === GLOBAL_PRECEDENT_SCOPE) return []
     const h = matterHeads.find((x) => x.id === uploadHeadTypeId)
     return (h?.sub_types ?? []).map((s) => ({ id: s.id, label: s.name }))
   }, [matterHeads, uploadHeadTypeId])
 
-  const flatCatsBySubName = useMemo(() => {
-    const m = new Map<string, PrecedentCategoryFlatOut[]>()
-    for (const c of flatCats) {
-      const k = c.matter_sub_type_name
-      if (!m.has(k)) m.set(k, [])
-      m.get(k)!.push(c)
-    }
-    return m
-  }, [flatCats])
+  const headIsGlobal = uploadHeadTypeId === GLOBAL_PRECEDENT_SCOPE
+  const scopeFormComplete = useMemo(() => {
+    if (!uploadHeadTypeId) return false
+    if (headIsGlobal) return true
+    if (!uploadSubTypeId) return false
+    if (uploadSubTypeId === GLOBAL_PRECEDENT_SCOPE) return true
+    return Boolean(uploadCategoryId)
+  }, [uploadHeadTypeId, headIsGlobal, uploadSubTypeId, uploadCategoryId])
 
   useEffect(() => {
-    if (!uploadSubTypeId) {
+    if (
+      !uploadSubTypeId ||
+      uploadSubTypeId === GLOBAL_PRECEDENT_SCOPE ||
+      uploadHeadTypeId === GLOBAL_PRECEDENT_SCOPE
+    ) {
       setUploadCats([])
+      setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
+      setUploadCatsFetchErr(null)
       return
     }
+    setUploadCatsLoading(true)
+    setUploadCatsFetchErr(null)
     void apiFetch<PrecedentCategoryOut[]>(`/matter-types/sub-types/${uploadSubTypeId}/precedent-categories`, { token })
-      .then((list) => setUploadCats(list))
-      .catch(() => setUploadCats([]))
-  }, [uploadSubTypeId, token])
-
-  /** First category for the selected sub-type (API order: sort_order, name). Used as upload target. */
-  const uploadTargetCategoryId = uploadCats[0]?.id
+      .then((list) => {
+        setUploadCats(list)
+        setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
+      })
+      .catch((e: unknown) => {
+        setUploadCats([])
+        setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
+        setUploadCatsFetchErr((e as ApiError)?.message ?? 'Could not load precedent categories for this sub-type')
+      })
+      .finally(() => setUploadCatsLoading(false))
+  }, [uploadSubTypeId, uploadHeadTypeId, token])
 
   async function load() {
     setBusy(true)
     setErr(null)
     try {
-      const [data, heads, flat] = await Promise.all([
+      const [data, heads] = await Promise.all([
         apiFetch<PrecedentOut[]>('/precedents', { token }),
         apiFetch<MatterHeadTypeOut[]>('/matter-types', { token }),
-        apiFetch<PrecedentCategoryFlatOut[]>('/matter-types/all-precedent-categories', { token }),
       ])
       setItems(data)
       setMatterHeads(heads)
-      setFlatCats(flat)
     } catch (e: any) {
       setErr(e?.message ?? 'Failed to load precedents')
     } finally {
@@ -2851,6 +2863,13 @@ function AdminPrecedents({ token }: { token: string }) {
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    if (uploadHeadTypeId === GLOBAL_PRECEDENT_SCOPE) {
+      setUploadSubTypeId(GLOBAL_PRECEDENT_SCOPE)
+      setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
+    }
+  }, [uploadHeadTypeId])
 
   useEffect(() => {
     if (!nameEditId) return
@@ -2899,9 +2918,12 @@ function AdminPrecedents({ token }: { token: string }) {
       {err ? <div className="error">{err}</div> : null}
       <div className="card" style={{ padding: 12 }}>
         <div className="muted" style={{ marginBottom: 8 }}>
-          Upload a template. Choose matter type and sub-type. The precedent is filed under the first category for that
-          sub-type (see Admin → Matters to add or reorder categories).
+          Upload a template. Choose <strong>Global</strong> at any level to widen availability: <strong>Matter type</strong>{' '}
+          Global = all cases; <strong>Sub-type</strong> Global = all sub-types under the chosen matter type;{' '}
+          <strong>Precedent category</strong> Global = all categories under the chosen sub-type. Otherwise pick a specific
+          value. Add named categories under <strong>Admin → Matters</strong> if you need a specific category.
         </div>
+        {uploadCatsFetchErr ? <div className="error" style={{ marginBottom: 8 }}>{uploadCatsFetchErr}</div> : null}
         <div className="stack">
           <label className="field">
             <span>Name</span>
@@ -2927,10 +2949,12 @@ function AdminPrecedents({ token }: { token: string }) {
                 const v = e.target.value
                 setUploadHeadTypeId(v)
                 setUploadSubTypeId('')
+                setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
               }}
               disabled={busy}
             >
               <option value="">— select —</option>
+              <option value={GLOBAL_PRECEDENT_SCOPE}>Global (all cases)</option>
               {matterTypeOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
@@ -2942,16 +2966,22 @@ function AdminPrecedents({ token }: { token: string }) {
             <span>Sub-type</span>
             <select
               value={uploadSubTypeId}
-              onChange={(e) => setUploadSubTypeId(e.target.value)}
-              disabled={busy || !uploadHeadTypeId}
+              onChange={(e) => {
+                setUploadSubTypeId(e.target.value)
+                setUploadCategoryId(GLOBAL_PRECEDENT_SCOPE)
+              }}
+              disabled={busy || !uploadHeadTypeId || headIsGlobal}
             >
               {!uploadHeadTypeId ? (
                 <option value="">Select a matter type first</option>
+              ) : headIsGlobal ? (
+                <option value={GLOBAL_PRECEDENT_SCOPE}>Global</option>
               ) : uploadSubTypeOptions.length === 0 ? (
                 <option value="">No sub-types for this matter type</option>
               ) : (
                 <>
                   <option value="">— select —</option>
+                  <option value={GLOBAL_PRECEDENT_SCOPE}>Global (all sub-types under this matter type)</option>
                   {uploadSubTypeOptions.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
@@ -2961,9 +2991,52 @@ function AdminPrecedents({ token }: { token: string }) {
               )}
             </select>
           </label>
+          {uploadHeadTypeId &&
+          !headIsGlobal &&
+          uploadSubTypeId &&
+          uploadSubTypeId !== GLOBAL_PRECEDENT_SCOPE &&
+          uploadCatsLoading ? (
+            <div className="muted" style={{ fontSize: 13 }}>
+              Loading precedent categories…
+            </div>
+          ) : null}
+          {uploadHeadTypeId &&
+          !headIsGlobal &&
+          uploadSubTypeId &&
+          uploadSubTypeId !== GLOBAL_PRECEDENT_SCOPE &&
+          !uploadCatsLoading &&
+          !uploadCatsFetchErr &&
+          uploadCats.length === 0 ? (
+            <div className="error" style={{ fontSize: 13 }}>
+              No named precedent categories exist for this sub-type. You can still choose <strong>Global</strong> above
+              to apply to all categories, or add categories under <strong>Admin → Matters</strong>.
+            </div>
+          ) : null}
+          {uploadHeadTypeId &&
+          !headIsGlobal &&
+          uploadSubTypeId &&
+          uploadSubTypeId !== GLOBAL_PRECEDENT_SCOPE &&
+          !uploadCatsLoading ? (
+            <label className="field">
+              <span>Precedent category</span>
+              <select
+                value={uploadCategoryId}
+                onChange={(e) => setUploadCategoryId(e.target.value)}
+                disabled={busy}
+              >
+                <option value={GLOBAL_PRECEDENT_SCOPE}>Global (all categories under this sub-type)</option>
+                {uploadCats.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="field">
             <span>File</span>
             <input
+              key={fileInputKey}
               type="file"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
@@ -2973,22 +3046,37 @@ function AdminPrecedents({ token }: { token: string }) {
             className="btn primary"
             disabled={
               busy ||
+              uploadCatsLoading ||
               !name.trim() ||
               !reference.trim() ||
               !file ||
-              !uploadSubTypeId ||
-              !uploadTargetCategoryId
+              !scopeFormComplete
             }
             onClick={async () => {
-              if (!file || !uploadTargetCategoryId) return
+              if (!file || !scopeFormComplete) return
               setBusy(true)
               setErr(null)
               try {
+                let mh: string = GLOBAL_PRECEDENT_SCOPE
+                let ms: string = GLOBAL_PRECEDENT_SCOPE
+                let mc: string = GLOBAL_PRECEDENT_SCOPE
+                if (uploadHeadTypeId && uploadHeadTypeId !== GLOBAL_PRECEDENT_SCOPE) {
+                  mh = uploadHeadTypeId
+                  if (uploadSubTypeId && uploadSubTypeId !== GLOBAL_PRECEDENT_SCOPE) {
+                    ms = uploadSubTypeId
+                    mc = uploadCategoryId || GLOBAL_PRECEDENT_SCOPE
+                  } else {
+                    ms = GLOBAL_PRECEDENT_SCOPE
+                    mc = GLOBAL_PRECEDENT_SCOPE
+                  }
+                }
                 const fd = new FormData()
                 fd.set('name', name.trim())
                 fd.set('reference', reference.trim())
                 fd.set('kind', kind)
-                fd.set('category_id', uploadTargetCategoryId)
+                fd.set('matter_head_type_id', mh)
+                fd.set('matter_sub_type_id', ms)
+                fd.set('category_id', mc)
                 fd.set('upload', file)
                 const res = await fetch(apiUrl('/precedents'), {
                   method: 'POST',
@@ -2996,15 +3084,23 @@ function AdminPrecedents({ token }: { token: string }) {
                   body: fd,
                 })
                 if (!res.ok) {
-                  const body = await res.json().catch(() => ({}))
-                  throw new Error((body as { detail?: string }).detail ?? res.statusText)
+                  const raw = await res.text()
+                  let parsed: unknown = null
+                  try {
+                    parsed = raw ? JSON.parse(raw) : null
+                  } catch {
+                    parsed = raw
+                  }
+                  const statusFallback = (res.statusText || '').trim() || `HTTP ${res.status}`
+                  throw new Error(formatApiErrorDetail(parsed, statusFallback))
                 }
                 setName('')
                 setReference('')
                 setFile(null)
+                setFileInputKey((k) => k + 1)
                 await load()
-              } catch (e: any) {
-                setErr(e?.message ?? 'Upload failed')
+              } catch (e: unknown) {
+                setErr((e as { message?: string }).message ?? 'Upload failed')
               } finally {
                 setBusy(false)
               }
@@ -3101,40 +3197,11 @@ function AdminPrecedents({ token }: { token: string }) {
               </div>
               <div className="muted" style={{ fontSize: 12 }}>
                 {p.original_filename}
-                {p.category_name ? <span> · {p.category_name}</span> : null}
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {p.scope_summary || p.category_name || '—'}
               </div>
             </div>
-            <select
-              style={{ maxWidth: 280 }}
-              value={p.category_id}
-              disabled={busy || flatCats.length === 0}
-              onChange={async (e) => {
-                const v = e.target.value
-                if (!v) return
-                setBusy(true)
-                setErr(null)
-                try {
-                  await apiFetch(`/precedents/${p.id}`, {
-                    token,
-                    method: 'PATCH',
-                    json: { category_id: v },
-                  })
-                  await load()
-                } catch (e2: any) {
-                  setErr(e2?.message ?? 'Failed to update category')
-                } finally {
-                  setBusy(false)
-                }
-              }}
-            >
-              {[...flatCatsBySubName.entries()].map(([subName, list]) => (
-                <optgroup key={subName} label={subName}>
-                  {list.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
             <div className="row" style={{ gap: 8 }}>
               <button
                 type="button"

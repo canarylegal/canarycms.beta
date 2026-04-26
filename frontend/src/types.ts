@@ -222,6 +222,8 @@ export type CaseOut = {
   status: CaseWorkflowStatus
   practice_area?: string | null
   matter_sub_type_id?: string | null
+  /** Derived from the matter sub-type; may be set without sub for legacy rows. */
+  matter_head_type_id?: string | null
   matter_sub_type_name?: string | null
   matter_head_type_name?: string | null
   matter_menus?: MatterMenuItemOut[]
@@ -282,6 +284,9 @@ export type PrecedentCategoryFlatOut = PrecedentCategoryOut & {
   matter_sub_type_name: string
 }
 
+/** Form/API token for Global scope (must match backend GLOBAL_SCOPE). */
+export const GLOBAL_PRECEDENT_SCOPE = '__GLOBAL__'
+
 export type PrecedentOut = {
   id: string
   name: string
@@ -289,8 +294,13 @@ export type PrecedentOut = {
   kind: 'letter' | 'email' | 'document'
   original_filename: string
   mime_type: string
-  category_id: string
+  category_id?: string | null
+  matter_head_type_id?: string | null
+  matter_sub_type_id?: string | null
   category_name?: string | null
+  matter_head_type_name?: string | null
+  matter_sub_type_name?: string | null
+  scope_summary?: string
   created_at: string
 }
 

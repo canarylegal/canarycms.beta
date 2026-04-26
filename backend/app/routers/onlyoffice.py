@@ -1,5 +1,10 @@
 """
 ONLYOFFICE Document Server callback (save). Document URL uses the same WebDAV session token as checkout.
+
+Canary print staging: ``downloadAs('pdf')`` and native print both yield DS URLs under ``/cache/files/…``
+or ``/printfile/…``. The backend fetches those only on the internal DS base (SSRF-safe); the SPA
+``/oo-print`` route loads PDF.js and ``window.print()`` using staged bytes from ``/onlyoffice/print-staged-pdf``
+so Firefox does not hand off ``application/pdf`` to the global PDF handler.
 """
 
 from __future__ import annotations
@@ -7,6 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,13 +23,16 @@ from urllib.parse import urlparse, urlunparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from jose import JWTError, jwt
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.deps import get_current_user
 from app.file_storage import FILES_ROOT, ensure_files_root
-from app.models import File as DbFile, FileEditSession
+from app.models import File as DbFile, FileEditSession, User
 from app.audit import log_event
 
 router = APIRouter(prefix="/onlyoffice", tags=["onlyoffice"])
@@ -31,12 +42,41 @@ log = logging.getLogger(__name__)
 _OO_INTERNAL_HOSTS = {"onlyoffice", "canary-onlyoffice"}
 
 
+def _strip_ds_reverse_proxy_prefix(path: str) -> str:
+    """Strip the public site path prefix where DS is mounted (e.g. /office-ds).
+
+    Callback URLs often look like ``https://app/office-ds/cache/...``. The Document Server
+    container serves ``/cache/...`` at its HTTP root, not ``/office-ds/cache/...``, so the
+    backend must fetch ``http://onlyoffice/cache/...`` — not ``http://onlyoffice/office-ds/...``
+    (which returns 404).
+
+    Override with env ``ONLYOFFICE_DS_PATH_PREFIX_STRIP`` (default ``/office-ds``). Set the
+    variable to an empty string to disable stripping.
+    """
+    env_val = os.getenv("ONLYOFFICE_DS_PATH_PREFIX_STRIP")
+    if env_val is not None and env_val.strip() == "":
+        return path
+    raw = (env_val if env_val is not None else "/office-ds").strip()
+    if not raw or raw == "/":
+        return path
+    prefix = raw.rstrip("/")
+    p = path if path.startswith("/") else f"/{path}"
+    if p == prefix:
+        return "/"
+    if p.startswith(prefix + "/"):
+        return p[len(prefix) :] or "/"
+    return p
+
+
 def _rewrite_oo_download_url(url: str) -> str:
     """Rewrite the OO DS download URL so the backend container can reach it.
 
     OO DS embeds the browser's X-Forwarded-Host (e.g. localhost:5173) in its callback payload.
     That URL works from the user's browser but not from inside the backend Docker container.
     Rewrite non-Docker hosts to the OO DS internal URL (default: http://onlyoffice).
+
+    Also strips the reverse-proxy path prefix (``/office-ds``) so internal fetches hit DS paths
+    the container actually serves.
     """
     oo_internal = (os.getenv("ONLYOFFICE_DS_INTERNAL_URL") or "http://onlyoffice").strip().rstrip("/")
     try:
@@ -44,11 +84,25 @@ def _rewrite_oo_download_url(url: str) -> str:
         host = (p.hostname or "").lower()
         int_host = (urlparse(oo_internal).hostname or "onlyoffice").lower()
         known = _OO_INTERNAL_HOSTS | {int_host}
+        path_norm = _strip_ds_reverse_proxy_prefix(p.path or "/")
+
         if host in known:
-            return url  # already a Docker-internal URL; no rewrite needed
+            out = urlunparse((p.scheme, p.netloc, path_norm, p.params, p.query, p.fragment))
+            if out != url:
+                log.info("_rewrite_oo_download_url (internal host): %s → %s", url, out)
+            return out
+
         base = urlparse(oo_internal)
-        rewritten = urlunparse((base.scheme or "http", base.netloc or "onlyoffice",
-                                p.path, p.params, p.query, p.fragment))
+        rewritten = urlunparse(
+            (
+                base.scheme or "http",
+                base.netloc or "onlyoffice",
+                path_norm,
+                p.params,
+                p.query,
+                p.fragment,
+            )
+        )
         log.info("_rewrite_oo_download_url: %s → %s", url, rewritten)
         return rewritten
     except Exception as exc:
@@ -106,6 +160,180 @@ def _decode_callback_payload(request: Request, body: Any) -> dict[str, Any]:
         return body
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid JWT")
+
+
+_PRINT_STAGING_TTL_SECONDS = int(os.getenv("ONLYOFFICE_PRINT_STAGE_TTL_SECONDS", "900"))
+_PRINT_STAGING_MAX_BYTES = int(os.getenv("ONLYOFFICE_PRINT_STAGE_MAX_BYTES", str(50 * 1024 * 1024)))
+_PRINT_JWT_ALG = "HS256"
+_PRINT_JWT_PURPOSE = "oo_print_staged"
+_PRINT_STORE_LOCK = threading.Lock()
+_PRINT_STORE: dict[str, tuple[bytes, float]] = {}
+
+
+def _print_stage_secret_raw() -> str:
+    return (os.getenv("ONLYOFFICE_JWT_SECRET") or "").strip()
+
+
+def _gc_print_store_unlocked(now: float) -> None:
+    dead = [k for k, (_, exp) in _PRINT_STORE.items() if exp <= now]
+    for k in dead:
+        _PRINT_STORE.pop(k, None)
+
+
+def _normalized_ds_path_for_print_allowlist(url: str) -> str:
+    try:
+        p = urlparse(url)
+        return _strip_ds_reverse_proxy_prefix(p.path or "/")
+    except Exception:
+        return ""
+
+
+def _is_allowed_onlyoffice_ds_fetch_path(path: str) -> bool:
+    if not path.startswith("/"):
+        path = "/" + path
+    parts: list[str] = []
+    for seg in path.split("/"):
+        if seg in ("", "."):
+            continue
+        if seg == "..":
+            if parts:
+                parts.pop()
+            else:
+                return False
+        else:
+            parts.append(seg)
+    norm = "/" + "/".join(parts)
+    return norm.startswith("/printfile/") or norm.startswith("/cache/files/")
+
+
+def _internal_fetch_url_from_browser(browser_url: str) -> str:
+    u = browser_url.strip()
+    if not u or not re.match(r"^https?://", u, re.I):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="browser_url must be an http(s) URL",
+        )
+    rewritten = _rewrite_oo_download_url(u)
+    norm_path = _normalized_ds_path_for_print_allowlist(rewritten)
+    if not _is_allowed_onlyoffice_ds_fetch_path(norm_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="URL must target ONLYOFFICE /printfile/… or /cache/files/…",
+        )
+    try:
+        fu = urlparse(rewritten)
+        if fu.scheme not in ("http", "https"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid URL scheme")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning("print-stage: bad URL %r: %s", rewritten, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid URL") from exc
+    return rewritten
+
+
+def _encode_print_staging_jwt(*, sid: str) -> str:
+    secret = _print_stage_secret_raw()
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ONLYOFFICE JWT secret is not configured",
+        )
+    now = int(time.time())
+    ttl = min(_PRINT_STAGING_TTL_SECONDS, 3600)
+    return jwt.encode(
+        {
+            "purpose": _PRINT_JWT_PURPOSE,
+            "sid": sid,
+            "iat": now,
+            "exp": now + ttl,
+        },
+        secret,
+        algorithm=_PRINT_JWT_ALG,
+    )
+
+
+def _decode_print_staging_jwt(token: str) -> str:
+    secret = _print_stage_secret_raw()
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ONLYOFFICE JWT secret is not configured",
+        )
+    try:
+        payload = jwt.decode(token, secret, algorithms=[_PRINT_JWT_ALG])
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired print token",
+        ) from e
+    if payload.get("purpose") != _PRINT_JWT_PURPOSE:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid print token")
+    sid = payload.get("sid")
+    if not isinstance(sid, str) or not sid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid print token")
+    return sid
+
+
+class PrintStageIn(BaseModel):
+    browser_url: str = Field(..., min_length=8, max_length=8000)
+
+
+@router.post("/print-stage")
+async def onlyoffice_print_stage(
+    body: PrintStageIn,
+    _user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    fetch_url = _internal_fetch_url_from_browser(body.browser_url)
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            r = await client.get(fetch_url)
+            r.raise_for_status()
+            data = r.content
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("print-stage: fetch failed url=%s", fetch_url)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not fetch PDF from Document Server",
+        ) from e
+
+    if len(data) > _PRINT_STAGING_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="PDF exceeds staging size limit",
+        )
+    if not data.startswith(b"%PDF"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Response is not a PDF")
+
+    sid = uuid.uuid4().hex
+    exp = time.time() + _PRINT_STAGING_TTL_SECONDS
+    with _PRINT_STORE_LOCK:
+        _gc_print_store_unlocked(time.time())
+        _PRINT_STORE[sid] = (data, exp)
+
+    t = _encode_print_staging_jwt(sid=sid)
+    return {"sid": sid, "t": t}
+
+
+@router.get("/print-staged-pdf")
+async def onlyoffice_print_staged_pdf(
+    sid: str = Query(..., min_length=8, max_length=128),
+    t: str = Query(..., min_length=10, max_length=4096),
+) -> Response:
+    jwt_sid = _decode_print_staging_jwt(t)
+    if jwt_sid != sid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="sid mismatch")
+    with _PRINT_STORE_LOCK:
+        entry = _PRINT_STORE.get(sid)
+        if not entry:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Print session expired or not found")
+        data, exp = entry
+        if exp <= time.time():
+            _PRINT_STORE.pop(sid, None)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Print session expired")
+    return Response(content=data, media_type="application/pdf")
 
 
 @router.post("/callback")

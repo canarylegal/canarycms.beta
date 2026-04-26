@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
+_MISSING = object()
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,16 +19,20 @@ router = APIRouter(prefix="/cases", tags=["cases"])
 
 def _matter_names(
     matter_sub_type_id: uuid.UUID | None,
+    matter_head_type_id: uuid.UUID | None,
     db: Session,
 ) -> tuple[str | None, str | None]:
-    """Return (sub_type_name, head_type_name) for a given matter_sub_type_id."""
-    if not matter_sub_type_id:
-        return None, None
-    sub = db.get(MatterSubType, matter_sub_type_id)
-    if not sub:
-        return None, None
-    head = db.get(MatterHeadType, sub.head_type_id)
-    return sub.name, (head.name if head else None)
+    """Return (sub_type_name, head_type_name). Sub-type wins for head name when both are set."""
+    if matter_sub_type_id:
+        sub = db.get(MatterSubType, matter_sub_type_id)
+        if not sub:
+            return None, None
+        head = db.get(MatterHeadType, sub.head_type_id)
+        return sub.name, (head.name if head else None)
+    if matter_head_type_id:
+        head = db.get(MatterHeadType, matter_head_type_id)
+        return None, (head.name if head else None)
+    return None, None
 
 
 def _case_dict(
@@ -44,6 +50,7 @@ def _case_dict(
         "status": case.status,
         "practice_area": case.practice_area,
         "matter_sub_type_id": case.matter_sub_type_id,
+        "matter_head_type_id": case.matter_head_type_id,
         "matter_sub_type_name": sub_name,
         "matter_head_type_name": head_name,
         "matter_menus": matter_menus or [],
@@ -93,13 +100,20 @@ def create_case(
     counter.next_value = ref_num + 1
     case_number = f"{ref_num:06d}"
 
+    sub = db.get(MatterSubType, payload.matter_sub_type_id)
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Matter sub-type not found")
+    resolved_sub = sub.id
+    resolved_head = sub.head_type_id
+
     case = Case(
         case_number=case_number,
         client_name=None,
         title=payload.matter_description,
         status=payload.status,
         practice_area=payload.practice_area,
-        matter_sub_type_id=payload.matter_sub_type_id,
+        matter_sub_type_id=resolved_sub,
+        matter_head_type_id=resolved_head,
         created_by=user.id,
         is_locked=False,
     )
@@ -119,7 +133,7 @@ def create_case(
         entity_id=str(case.id),
         meta={"case_number": case.case_number, "client_name": case.client_name, "matter_description": case.title},
     )
-    sub_name, head_name = _matter_names(case.matter_sub_type_id, db)
+    sub_name, head_name = _matter_names(case.matter_sub_type_id, case.matter_head_type_id, db)
     menus = (
         _menus_for_sub_types({case.matter_sub_type_id}, db).get(case.matter_sub_type_id, [])
         if case.matter_sub_type_id
@@ -134,15 +148,16 @@ def list_cases(user: User = Depends(get_current_user), db: Session = Depends(get
 
     # Bulk load sub/head type names to avoid N+1 queries.
     sub_ids = {c.matter_sub_type_id for c in cases if c.matter_sub_type_id}
+    head_ids: set[uuid.UUID] = {c.matter_head_type_id for c in cases if c.matter_head_type_id}
     sub_map: dict[uuid.UUID, MatterSubType] = {}
     head_map: dict[uuid.UUID, MatterHeadType] = {}
     if sub_ids:
         subs = db.execute(select(MatterSubType).where(MatterSubType.id.in_(sub_ids))).scalars().all()
         sub_map = {s.id: s for s in subs}
-        head_ids = {s.head_type_id for s in subs}
-        if head_ids:
-            heads = db.execute(select(MatterHeadType).where(MatterHeadType.id.in_(head_ids))).scalars().all()
-            head_map = {h.id: h for h in heads}
+        head_ids |= {s.head_type_id for s in subs}
+    if head_ids:
+        heads = db.execute(select(MatterHeadType).where(MatterHeadType.id.in_(head_ids))).scalars().all()
+        head_map = {h.id: h for h in heads}
 
     menu_map = _menus_for_sub_types(sub_ids, db)
     result = []
@@ -154,6 +169,8 @@ def list_cases(user: User = Depends(get_current_user), db: Session = Depends(get
             sub_name = sub.name
             head = head_map.get(sub.head_type_id)
             head_name = head.name if head else None
+        elif c.matter_head_type_id and c.matter_head_type_id in head_map:
+            head_name = head_map[c.matter_head_type_id].name
         menus = menu_map.get(c.matter_sub_type_id, []) if c.matter_sub_type_id else []
         result.append(CaseOut.model_validate(_case_dict(c, sub_name, head_name, menus)))
     return result
@@ -199,7 +216,7 @@ def list_standard_tasks_for_case(
 @router.get("/{case_id}", response_model=CaseOut)
 def get_case(case_id: uuid.UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CaseOut:
     case = require_case_access(case_id, user, db)
-    sub_name, head_name = _matter_names(case.matter_sub_type_id, db)
+    sub_name, head_name = _matter_names(case.matter_sub_type_id, case.matter_head_type_id, db)
     menus = (
         _menus_for_sub_types({case.matter_sub_type_id}, db).get(case.matter_sub_type_id, [])
         if case.matter_sub_type_id
@@ -221,6 +238,35 @@ def update_case(
     # Map API field to DB field
     if "matter_description" in data:
         data["title"] = data.pop("matter_description")
+
+    ms = data.pop("matter_sub_type_id", _MISSING)
+    mh = data.pop("matter_head_type_id", _MISSING)
+    if ms is not _MISSING or mh is not _MISSING:
+        if ms is not _MISSING and ms is not None:
+            sub = db.get(MatterSubType, ms)
+            if not sub:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Matter sub-type not found")
+            case.matter_sub_type_id = sub.id
+            case.matter_head_type_id = sub.head_type_id
+        elif ms is not _MISSING and ms is None:
+            case.matter_sub_type_id = None
+            if mh is not _MISSING:
+                if mh is not None:
+                    if db.get(MatterHeadType, mh) is None:
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Matter head type not found")
+                    case.matter_head_type_id = mh
+                else:
+                    case.matter_head_type_id = None
+            else:
+                case.matter_head_type_id = None
+        elif mh is not _MISSING:
+            if case.matter_sub_type_id is not None:
+                pass
+            else:
+                if mh is not None and db.get(MatterHeadType, mh) is None:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Matter head type not found")
+                case.matter_head_type_id = mh
+
     for key, value in data.items():
         setattr(case, key, value)
     case.updated_at = datetime.utcnow()
@@ -236,7 +282,7 @@ def update_case(
         entity_id=str(case.id),
         meta=payload.model_dump(exclude_unset=True),
     )
-    sub_name, head_name = _matter_names(case.matter_sub_type_id, db)
+    sub_name, head_name = _matter_names(case.matter_sub_type_id, case.matter_head_type_id, db)
     menus = (
         _menus_for_sub_types({case.matter_sub_type_id}, db).get(case.matter_sub_type_id, [])
         if case.matter_sub_type_id

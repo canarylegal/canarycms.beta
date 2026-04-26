@@ -299,7 +299,7 @@ class CaseCreate(BaseModel):
     matter_description: str = Field(min_length=1, max_length=300)
     status: CaseStatus = CaseStatus.open
     practice_area: str | None = Field(default=None, max_length=200)
-    matter_sub_type_id: uuid.UUID | None = None
+    matter_sub_type_id: uuid.UUID
 
     @field_validator("status")
     @classmethod
@@ -315,6 +315,7 @@ class CaseUpdate(BaseModel):
     status: CaseStatus | None = None
     practice_area: str | None = Field(default=None, max_length=200)
     matter_sub_type_id: uuid.UUID | None = None
+    matter_head_type_id: uuid.UUID | None = None
     is_locked: bool | None = None
     lock_mode: CaseLockMode | None = None
 
@@ -333,6 +334,7 @@ class CaseOut(BaseModel):
     status: CaseStatus
     practice_area: str | None
     matter_sub_type_id: uuid.UUID | None
+    matter_head_type_id: uuid.UUID | None
     matter_sub_type_name: str | None
     matter_head_type_name: str | None
     matter_menus: list[MatterMenuItemOut] = Field(default_factory=list)
@@ -421,8 +423,13 @@ class PrecedentOut(BaseModel):
     kind: PrecedentKind
     original_filename: str
     mime_type: str
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None = None
+    matter_head_type_id: uuid.UUID | None = None
+    matter_sub_type_id: uuid.UUID | None = None
     category_name: str | None = None
+    matter_head_type_name: str | None = None
+    matter_sub_type_name: str | None = None
+    scope_summary: str = ""
     created_at: datetime
 
 
@@ -430,6 +437,8 @@ class PrecedentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=300)
     reference: str | None = Field(default=None, min_length=1, max_length=200)
     category_id: uuid.UUID | None = None
+    matter_head_type_id: uuid.UUID | None = None
+    matter_sub_type_id: uuid.UUID | None = None
 
 
 class ComposeOfficeDocumentIn(BaseModel):

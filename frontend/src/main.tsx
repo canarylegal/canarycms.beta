@@ -50,7 +50,12 @@ if (!el) {
   const ledgerCaseId = searchParams.get('ledger')
   const tasksCaseId = searchParams.get('tasks')
 
-  if (window.location.pathname.startsWith('/editor/')) {
+  if (window.location.pathname === '/oo-print') {
+    document.documentElement.style.zoom = '1'
+    void import('./OnlyOfficePrintPage.tsx').then(({ default: OnlyOfficePrintPage }) => {
+      root.render(<OnlyOfficePrintPage />)
+    })
+  } else if (window.location.pathname.startsWith('/editor/')) {
     // Reset the html { zoom: 1.2 } from index.css — OO DS needs unscaled coordinates
     document.documentElement.style.zoom = '1'
     root.render(<EditorPage />)
