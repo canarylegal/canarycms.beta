@@ -1,23 +1,17 @@
 """Add case.matter_head_type_id — aligns DB with Case ORM (formerly missing revision).
-
 Revision ID: e8f9a0b1c2d3
 Revises: f0a1b2c3d4e5
 Create Date: 2026-04-28
 """
-
 from __future__ import annotations
-
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import inspect
 from sqlalchemy.dialects.postgresql import UUID
-
 revision = "e8f9a0b1c2d3"
 down_revision = "f0a1b2c3d4e5"
 branch_labels = None
 depends_on = None
-
-
 def upgrade() -> None:
     bind = op.get_bind()
     cols = {c["name"] for c in inspect(bind).get_columns("case")}
@@ -33,8 +27,6 @@ def upgrade() -> None:
         ondelete="SET NULL",
     )
     op.create_index("ix_case_matter_head_type_id", "case", ["matter_head_type_id"])
-
-
 def downgrade() -> None:
     bind = op.get_bind()
     cols = {c["name"] for c in inspect(bind).get_columns("case")}
